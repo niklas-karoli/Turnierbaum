@@ -36,6 +36,9 @@ export const updateMatchResult = (tournament, matchId, score1, score2) => {
     winnerId,
     loserId,
     status: MATCH_STATUS.COMPLETED,
+    isTimerRunning: false,
+    timerStartedAt: null,
+    timerRemaining: 0,
   };
 
   let updatedTournament = replaceMatchInTournament(tournament, updatedMatch);

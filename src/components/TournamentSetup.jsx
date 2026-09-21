@@ -3,8 +3,6 @@ import {
   Trophy,
   Users,
   User,
-  LayoutGrid,
-  Settings,
   Plus,
   Trash2,
   Shuffle,
@@ -16,7 +14,6 @@ import {
   TOURNAMENT_SYSTEMS,
   TOURNAMENT_SYSTEM_NAMES,
   TEAM_COLORS,
-  DEFAULT_RULES,
 } from '../types';
 import { generateSingleElimination } from '../engines/singleElimination';
 import { generateDoubleElimination } from '../engines/doubleElimination';
@@ -29,9 +26,8 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
   const [step, setStep] = useState(1);
 
   // Form State
-  const [name, setName] = useState('Sommer-Cup 2025');
-  const [mode, setMode] = useState('team'); // 'solo' | 'team'
-  const [teamSize, setTeamSize] = useState('2v2'); // '1v1', '2v2', 'custom'
+  const [name, setName] = useState('Turnier 2025');
+  const [formatOption, setFormatOption] = useState('2v2'); // '1v1', '2v2', '3v3', '5v5', 'custom'
   const [system, setSystem] = useState(TOURNAMENT_SYSTEMS.SINGLE_ELIMINATION);
   const [fieldCount, setFieldCount] = useState(2);
   const [seeded, setSeeded] = useState(false);
@@ -43,6 +39,10 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
   const [groupCount, setGroupCount] = useState(2);
   const [advancingPerGroup, setAdvancingPerGroup] = useState(2);
   const [swissRounds, setSwissRounds] = useState(4);
+
+  // Derived mode & teamSize
+  const mode = formatOption === '1v1' ? 'solo' : 'team';
+  const teamSize = formatOption;
 
   // Teams state
   const [teams, setTeams] = useState([
@@ -155,16 +155,16 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden my-8">
         {/* Wizard Header */}
-        <div className="bg-slate-800/80 border-b border-slate-700/60 p-6 flex items-center justify-between">
+        <div className="bg-slate-900 border-b border-slate-800 p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
-              <Trophy className="w-6 h-6" />
+            <div className="p-2.5 bg-slate-800 text-indigo-400 rounded-xl border border-slate-700/60">
+              <Trophy className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Neues Turnier erstellen</h2>
+              <h2 className="text-lg font-bold text-white tracking-tight">Neues Turnier erstellen</h2>
               <p className="text-xs text-slate-400">Schritt {step} von 3</p>
             </div>
           </div>
@@ -172,7 +172,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
           {onClose && (
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white text-sm px-3 py-1 rounded-lg hover:bg-slate-800"
+              className="text-slate-400 hover:text-white text-xs px-3 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 transition"
             >
               Abbrechen
             </button>
@@ -180,22 +180,22 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
         </div>
 
         {/* Step Progress Bar */}
-        <div className="grid grid-cols-3 border-b border-slate-800 text-xs font-semibold">
+        <div className="grid grid-cols-3 border-b border-slate-800 text-xs font-medium">
           <div
             className={`p-3 text-center transition ${
               step === 1
-                ? 'bg-indigo-600/20 text-indigo-400 border-b-2 border-indigo-500'
+                ? 'bg-slate-800/60 text-indigo-400 border-b-2 border-indigo-500 font-semibold'
                 : step > 1
                 ? 'text-emerald-400'
                 : 'text-slate-500'
             }`}
           >
-            1. Modus & System
+            1. Format & System
           </div>
           <div
             className={`p-3 text-center transition ${
               step === 2
-                ? 'bg-indigo-600/20 text-indigo-400 border-b-2 border-indigo-500'
+                ? 'bg-slate-800/60 text-indigo-400 border-b-2 border-indigo-500 font-semibold'
                 : step > 2
                 ? 'text-emerald-400'
                 : 'text-slate-500'
@@ -206,7 +206,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
           <div
             className={`p-3 text-center transition ${
               step === 3
-                ? 'bg-indigo-600/20 text-indigo-400 border-b-2 border-indigo-500'
+                ? 'bg-slate-800/60 text-indigo-400 border-b-2 border-indigo-500 font-semibold'
                 : 'text-slate-500'
             }`}
           >
@@ -216,7 +216,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
 
         {/* Form Body */}
         <div className="p-6 space-y-6">
-          {/* STEP 1: Basic Info & System */}
+          {/* STEP 1: Basic Info & Integrated Format Selection */}
           {step === 1 && (
             <div className="space-y-5">
               <div>
@@ -227,59 +227,44 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="z. B. Mario Kart / Tischfußball / FIFA Cup"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-indigo-500"
+                  placeholder="z. B. Mario Kart Cup / Kicker Master"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                    Teilnehmer-Typ
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setMode('solo')}
-                      className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border font-semibold text-sm transition ${
-                        mode === 'solo'
-                          ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
-                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                      }`}
-                    >
-                      <User className="w-4 h-4" />
-                      <span>Einzel (Solo)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMode('team')}
-                      className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl border font-semibold text-sm transition ${
-                        mode === 'team'
-                          ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
-                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                      }`}
-                    >
-                      <Users className="w-4 h-4" />
-                      <span>Teams</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                    Teamgröße / Format
-                  </label>
-                  <select
-                    value={teamSize}
-                    onChange={(e) => setTeamSize(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="1v1">1 vs 1 (Singles)</option>
-                    <option value="2v2">2 vs 2 (Doubles / Doppel)</option>
-                    <option value="3v3">3 vs 3</option>
-                    <option value="5v5">5 vs 5</option>
-                    <option value="custom">Benutzerdefiniert</option>
-                  </select>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Spiel-Format / Teamgröße
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    { id: '1v1', label: '1 vs 1', sub: 'Einzel (Solo)', icon: User },
+                    { id: '2v2', label: '2 vs 2', sub: 'Doppel (Team)', icon: Users },
+                    { id: '3v3', label: '3 vs 3', sub: 'Team', icon: Users },
+                    { id: '5v5', label: '5 vs 5', sub: 'Team', icon: Users },
+                    { id: 'custom', label: 'Custom', sub: 'Variabel', icon: Users },
+                  ].map((fmt) => {
+                    const Icon = fmt.icon;
+                    const isSelected = formatOption === fmt.id;
+                    return (
+                      <button
+                        key={fmt.id}
+                        type="button"
+                        onClick={() => setFormatOption(fmt.id)}
+                        className={`p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 ${
+                          isSelected
+                            ? 'bg-slate-800 border-indigo-500 text-white shadow-sm'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <Icon className={`w-4 h-4 ${isSelected ? 'text-indigo-400' : 'text-slate-500'}`} />
+                        <div>
+                          <div className="font-bold text-xs text-slate-100">{fmt.label}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{fmt.sub}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -292,23 +277,23 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                     <div
                       key={sysKey}
                       onClick={() => setSystem(sysKey)}
-                      className={`p-4 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
+                      className={`p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
                         system === sysKey
-                          ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200'
-                          : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
+                          ? 'bg-slate-800 border-indigo-500 text-slate-200'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                       }`}
                     >
-                      <div className={`mt-0.5 rounded-full p-1 ${system === sysKey ? 'bg-indigo-500 text-white' : 'bg-slate-700'}`}>
-                        <Check className="w-3.5 h-3.5" />
+                      <div className={`mt-0.5 rounded-full p-1 ${system === sysKey ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                        <Check className="w-3 h-3" />
                       </div>
                       <div>
-                        <div className="font-semibold text-sm">{sysName}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">
+                        <div className="font-semibold text-xs text-slate-200">{sysName}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
                           {sysKey === TOURNAMENT_SYSTEMS.SINGLE_ELIMINATION && 'Klassischer K.-o.-Baum, Verlierer scheiden aus.'}
-                          {sysKey === TOURNAMENT_SYSTEMS.DOUBLE_ELIMINATION && 'Mit Winner- und Loser-Bracket (2 Chancen).'}
-                          {sysKey === TOURNAMENT_SYSTEMS.ROUND_ROBIN && 'Jedes Team spielt gegen jedes andere Team (Liga).'}
-                          {sysKey === TOURNAMENT_SYSTEMS.HYBRID && 'Gruppenphase gefolgt von K.-o.-Playoffs.'}
-                          {sysKey === TOURNAMENT_SYSTEMS.SWISS && 'Mehrere Runden ohne Ausscheiden gegen punktgleiche Gegner.'}
+                          {sysKey === TOURNAMENT_SYSTEMS.DOUBLE_ELIMINATION && 'Winner- & Loser-Bracket (2 Chancen).'}
+                          {sysKey === TOURNAMENT_SYSTEMS.ROUND_ROBIN && 'Jeder gegen Jeden (Liga).'}
+                          {sysKey === TOURNAMENT_SYSTEMS.HYBRID && 'Gruppenphase + K.-o.-Playoffs.'}
+                          {sysKey === TOURNAMENT_SYSTEMS.SWISS && 'Runden ohne Ausscheiden gegen Gleichstarke.'}
                         </div>
                       </div>
                     </div>
@@ -332,9 +317,9 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                     max="16"
                     value={fieldCount}
                     onChange={(e) => setFieldCount(e.target.value)}
-                    className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg cursor-pointer"
+                    className="w-full accent-indigo-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
                   />
-                  <span className="font-bold text-lg text-indigo-400 w-12 text-center bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                  <span className="font-bold text-sm text-indigo-400 w-12 text-center bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
                     {fieldCount}
                   </span>
                 </div>
@@ -345,60 +330,60 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
 
               {/* System specific parameters */}
               {system === TOURNAMENT_SYSTEMS.HYBRID && (
-                <div className="grid grid-cols-2 gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700/60">
+                <div className="grid grid-cols-2 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Anzahl Gruppen</label>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Anzahl Gruppen</label>
                     <input
                       type="number"
                       min="2"
                       max="8"
                       value={groupCount}
                       onChange={(e) => setGroupCount(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Weiterkommer pro Gruppe</label>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Weiterkommer pro Gruppe</label>
                     <input
                       type="number"
                       min="1"
                       max="4"
                       value={advancingPerGroup}
                       onChange={(e) => setAdvancingPerGroup(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
                     />
                   </div>
                 </div>
               )}
 
               {system === TOURNAMENT_SYSTEMS.SWISS && (
-                <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/60">
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Anzahl Schweizer Runden</label>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Anzahl Schweizer Runden</label>
                   <input
                     type="number"
                     min="2"
                     max="10"
                     value={swissRounds}
                     onChange={(e) => setSwissRounds(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
                   />
                   <p className="text-xs text-slate-400 mt-1">Empfohlen für {teams.length} Teams: {getRecommendedSwissRounds(teams.length)} Runden</p>
                 </div>
               )}
 
               {/* Point allocation config */}
-              <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/60 space-y-3">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
                 <span className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Punkteverteilung (Liga / Schweizer System)
                 </span>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Punkte für Sieg</label>
+                    <label className="block text-xs text-slate-400 mb-1">Sieg</label>
                     <input
                       type="number"
                       value={pointsWin}
                       onChange={(e) => setPointsWin(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-100 text-xs"
                     />
                   </div>
                   <div>
@@ -407,7 +392,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                       type="number"
                       value={pointsDraw}
                       onChange={(e) => setPointsDraw(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-100 text-xs"
                     />
                   </div>
                   <div>
@@ -416,23 +401,23 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                       type="number"
                       value={pointsLoss}
                       onChange={(e) => setPointsLoss(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-100 text-xs"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Seeding option */}
-              <div className="flex items-center justify-between bg-slate-800/50 p-4 rounded-xl border border-slate-700/60">
+              <div className="flex items-center justify-between bg-slate-950 p-4 rounded-xl border border-slate-800">
                 <div>
-                  <span className="font-semibold text-sm text-slate-200">Setzliste berücksichtigen (Seeding)</span>
-                  <p className="text-xs text-slate-400">Setzt die stärksten Teams voneinander entfernt ins Bracket</p>
+                  <span className="font-medium text-xs text-slate-200">Setzliste berücksichtigen (Seeding)</span>
+                  <p className="text-[11px] text-slate-400">Setzt die stärksten Teams voneinander entfernt ins Bracket</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={seeded}
                   onChange={(e) => setSeeded(e.target.checked)}
-                  className="w-5 h-5 accent-indigo-500 rounded cursor-pointer"
+                  className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
                 />
               </div>
             </div>
@@ -445,34 +430,34 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                 <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Teilnehmerliste ({teams.length} {mode === 'solo' ? 'Spieler' : 'Teams'})
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => generatePlaceholders(4)}
-                    className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg transition"
+                    className="text-xs bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-lg transition"
                   >
-                    4 Platzhalter
+                    4
                   </button>
                   <button
                     type="button"
                     onClick={() => generatePlaceholders(8)}
-                    className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg transition"
+                    className="text-xs bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-lg transition"
                   >
-                    8 Platzhalter
+                    8
                   </button>
                   <button
                     type="button"
                     onClick={() => generatePlaceholders(16)}
-                    className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg transition"
+                    className="text-xs bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-lg transition"
                   >
                     16 Platzhalter
                   </button>
                   <button
                     type="button"
                     onClick={handleShuffleTeams}
-                    className="text-xs bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"
+                    className="text-xs bg-slate-800 hover:bg-slate-700/80 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-lg transition flex items-center gap-1"
                   >
-                    <Shuffle className="w-3 h-3" /> Mischen
+                    <Shuffle className="w-3 h-3 text-indigo-400" /> Mischen
                   </button>
                 </div>
               </div>
@@ -485,12 +470,12 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                   onChange={(e) => setNewTeamName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddTeam()}
                   placeholder={mode === 'solo' ? 'Spielername eingeben...' : 'Teamname eingeben...'}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
                 />
                 <button
                   type="button"
                   onClick={handleAddTeam}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-4 py-2 rounded-xl flex items-center gap-1.5 transition"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-4 py-2 rounded-xl flex items-center gap-1 transition"
                 >
                   <Plus className="w-4 h-4" /> Hinzufügen
                 </button>
@@ -501,12 +486,12 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                 {teams.map((t, idx) => (
                   <div
                     key={t.id}
-                    className="flex items-center justify-between p-3 bg-slate-800/80 border border-slate-700/60 rounded-xl"
+                    className="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-800 rounded-xl"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-slate-500 w-6">#{idx + 1}</span>
+                      <span className="text-xs font-mono text-slate-500 w-5">#{idx + 1}</span>
                       <div
-                        className="w-4 h-4 rounded-full border border-white/20"
+                        className="w-3.5 h-3.5 rounded-full border border-white/20"
                         style={{ backgroundColor: t.color }}
                       />
                       <input
@@ -517,7 +502,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                           updated[idx].name = e.target.value;
                           setTeams(updated);
                         }}
-                        className="bg-transparent text-sm font-medium text-slate-200 focus:outline-none border-b border-transparent focus:border-indigo-500"
+                        className="bg-transparent text-xs font-medium text-slate-200 focus:outline-none border-b border-transparent focus:border-indigo-500"
                       />
                     </div>
                     <button
@@ -525,7 +510,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                       onClick={() => handleRemoveTeam(t.id)}
                       className="text-slate-500 hover:text-red-400 p-1 transition"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
@@ -535,11 +520,11 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
         </div>
 
         {/* Wizard Footer Controls */}
-        <div className="bg-slate-800/80 border-t border-slate-700/60 p-6 flex items-center justify-between">
+        <div className="bg-slate-900 border-t border-slate-800 p-6 flex items-center justify-between">
           {step > 1 ? (
             <button
               onClick={() => setStep(step - 1)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700 transition"
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700/80 text-slate-300 font-medium text-xs rounded-xl border border-slate-700 transition"
             >
               Zurück
             </button>
@@ -550,7 +535,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
           {step < 3 ? (
             <button
               onClick={() => setStep(step + 1)}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition"
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl flex items-center gap-2 transition"
             >
               <span>Weiter</span>
               <ChevronRight className="w-4 h-4" />
@@ -558,7 +543,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
           ) : (
             <button
               onClick={handleCreate}
-              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition"
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-xl flex items-center gap-2 transition"
             >
               <Sparkles className="w-4 h-4" />
               <span>Turnier jetzt starten</span>
