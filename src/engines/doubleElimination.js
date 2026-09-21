@@ -3,9 +3,29 @@
  */
 
 import { MATCH_STATUS } from '../types';
-import { getNextPowerOfTwo, getRoundName } from './singleElimination';
+import { getNextPowerOfTwo } from './singleElimination';
 
-export const generateDoubleElimination = (teams, seeded = false) => {
+/**
+ * Generates standard tournament seeding indices for power-of-2
+ */
+const getSeedingPattern = (numSlots) => {
+  let pattern = [0, 1];
+  while (pattern.length < numSlots) {
+    const nextPattern = [];
+    const length = pattern.length * 2;
+    for (let i = 0; i < pattern.length; i++) {
+      nextPattern.push(pattern[i]);
+      nextPattern.push(length - 1 - pattern[i]);
+    }
+    pattern = nextPattern;
+  }
+  return pattern;
+};
+
+/**
+ * Generates a Double Elimination bracket with proper Byes support.
+ */
+export const generateDoubleElimination = (teams, seeded = false, _options = {}) => {
   const numTeams = teams.length;
   if (numTeams < 2) return { matches: [], rounds: [] };
 
@@ -15,6 +35,51 @@ export const generateDoubleElimination = (teams, seeded = false) => {
   let orderedTeams = [...teams];
   if (seeded) {
     orderedTeams.sort((a, b) => (a.seed || 999) - (b.seed || 999));
+  }
+
+  const numMatchesR1 = bracketSize / 2;
+  const numByes = bracketSize - numTeams;
+
+  // Assign teams to WB R1 matches
+  const wbR1MatchesTeams = new Array(numMatchesR1).fill(null).map(() => ({ team1: null, team2: null }));
+
+  if (seeded) {
+    const seedPositions = getSeedingPattern(bracketSize);
+    const slots = new Array(bracketSize).fill(null);
+    for (let i = 0; i < numTeams; i++) {
+      slots[seedPositions[i]] = orderedTeams[i];
+    }
+    for (let m = 0; m < numMatchesR1; m++) {
+      wbR1MatchesTeams[m].team1 = slots[m * 2];
+      wbR1MatchesTeams[m].team2 = slots[m * 2 + 1];
+    }
+  } else {
+    let byeCount = 0;
+    let teamIdx = 0;
+
+    const byeMatchesIndices = [];
+    for (let i = 0; i < numMatchesR1; i++) {
+      const idx = i % 2 === 0 ? Math.floor(i / 2) : numMatchesR1 - 1 - Math.floor(i / 2);
+      if (byeCount < numByes) {
+        byeMatchesIndices.push(idx);
+        byeCount++;
+      }
+    }
+
+    const playInIndices = [];
+    for (let m = 0; m < numMatchesR1; m++) {
+      if (byeMatchesIndices.includes(m)) {
+        wbR1MatchesTeams[m].team1 = orderedTeams[teamIdx++];
+        wbR1MatchesTeams[m].team2 = null;
+      } else {
+        playInIndices.push(m);
+      }
+    }
+
+    for (const m of playInIndices) {
+      wbR1MatchesTeams[m].team1 = orderedTeams[teamIdx++] || null;
+      wbR1MatchesTeams[m].team2 = orderedTeams[teamIdx++] || null;
+    }
   }
 
   const matches = [];
@@ -47,17 +112,20 @@ export const generateDoubleElimination = (teams, seeded = false) => {
       let team1 = null;
       let team2 = null;
       let status = MATCH_STATUS.PENDING;
+      let isBye = false;
 
       if (r === 1) {
-        team1 = orderedTeams[m * 2] || null;
-        team2 = orderedTeams[m * 2 + 1] || null;
+        team1 = wbR1MatchesTeams[m].team1;
+        team2 = wbR1MatchesTeams[m].team2;
 
         if (team1 && team2) {
           status = MATCH_STATUS.READY;
         } else if (team1 && !team2) {
           status = MATCH_STATUS.COMPLETED;
+          isBye = true;
         } else if (!team1 && team2) {
           status = MATCH_STATUS.COMPLETED;
+          isBye = true;
         }
       }
 
@@ -68,14 +136,15 @@ export const generateDoubleElimination = (teams, seeded = false) => {
         bracketType: 'winner',
         team1,
         team2,
-        score1: (r === 1 && team1 && !team2) ? 1 : 0,
-        score2: (r === 1 && !team1 && team2) ? 1 : 0,
-        winnerId: (r === 1 && team1 && !team2) ? team1.id : (r === 1 && !team1 && team2) ? team2.id : null,
+        score1: (r === 1 && isBye && team1) ? 1 : (r === 1 && isBye && team2) ? 0 : null,
+        score2: (r === 1 && isBye && team1) ? 0 : (r === 1 && isBye && team2) ? 1 : null,
+        winnerId: (r === 1 && isBye && team1) ? team1.id : (r === 1 && isBye && team2) ? team2.id : null,
         loserId: null,
         status,
+        isBye,
         nextMatchId,
         nextMatchPosition,
-        loserNextMatchId: `lb_r${r === 1 ? 1 : (r - 1) * 2}_m${Math.floor(m / 2) + 1}`,
+        loserNextMatchId: isBye ? null : `lb_r${r === 1 ? 1 : (r - 1) * 2}_m${Math.floor(m / 2) + 1}`,
         loserNextMatchPosition: m % 2 === 0 ? 'team1' : 'team2',
         fieldId: null,
       });
@@ -146,8 +215,8 @@ export const generateDoubleElimination = (teams, seeded = false) => {
     round: totalWbRounds + totalLbRounds + 1,
     matchIndex: 0,
     bracketType: 'grand_final',
-    team1: null, // Winner of WB
-    team2: null, // Winner of LB
+    team1: null,
+    team2: null,
     score1: null,
     score2: null,
     winnerId: null,
@@ -159,7 +228,7 @@ export const generateDoubleElimination = (teams, seeded = false) => {
 
   // Handle Round 1 WB BYEs propagation
   for (const match of matches) {
-    if (match.round === 1 && match.bracketType === 'winner' && match.status === MATCH_STATUS.COMPLETED && match.winnerId) {
+    if (match.round === 1 && match.bracketType === 'winner' && match.isBye && match.status === MATCH_STATUS.COMPLETED && match.winnerId) {
       const winningTeam = match.team1?.id === match.winnerId ? match.team1 : match.team2;
       const nextWbMatch = matches.find((m) => m.id === match.nextMatchId);
       if (nextWbMatch) {

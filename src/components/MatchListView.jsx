@@ -9,7 +9,7 @@ import {
 
 export const MatchListView = ({ tournament, onSelectMatch, onUpdateTournament }) => {
   const [filter, setFilter] = useState('all'); // 'all' | 'ready' | 'ongoing' | 'completed'
-  const [now, setNow] = useState(Date.now());
+  const [, setNow] = useState(0);
 
   const matches = tournament.system === 'hybrid' && tournament.playoffMatches
     ? [...tournament.matches, ...tournament.playoffMatches]
@@ -103,9 +103,21 @@ export const MatchListView = ({ tournament, onSelectMatch, onUpdateTournament })
             >
               {/* Header Badge Row */}
               <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-                <span>Match #{match.id.split('_').pop()}</span>
+                <span className="flex items-center gap-2">
+                  <span>Match #{match.id.split('_').pop()}</span>
+                  {match.name && (
+                    <span className="text-[10px] text-amber-400 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.5 rounded font-semibold">
+                      {match.name}
+                    </span>
+                  )}
+                </span>
                 <div className="flex items-center gap-2">
-                  {match.fieldId && (
+                  {match.isBye && (
+                    <span className="bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-md text-[10px] font-semibold">
+                      Freilos
+                    </span>
+                  )}
+                  {match.fieldId && !match.isBye && (
                     <span className="bg-slate-800 text-indigo-300 border border-slate-700 px-2 py-0.5 rounded-md text-[10px] font-semibold">
                       {match.fieldId.replace('field_', 'Feld ')}
                     </span>
@@ -167,11 +179,13 @@ export const MatchListView = ({ tournament, onSelectMatch, onUpdateTournament })
               {/* Status Footer */}
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">
-                  {match.status === MATCH_STATUS.COMPLETED && (
+                  {match.isBye ? (
+                    <span className="text-indigo-400 font-medium">Freilos – Automatisch vorgerückt</span>
+                  ) : match.status === MATCH_STATUS.COMPLETED ? (
                     <span className="text-emerald-400 flex items-center gap-1 font-medium">
                       <CheckCircle className="w-3.5 h-3.5" /> Beendet
                     </span>
-                  )}
+                  ) : null}
                   {match.status === MATCH_STATUS.ONGOING && (
                     <span className="text-amber-400 flex items-center gap-1 font-medium">
                       <Clock className="w-3.5 h-3.5" /> Laufend
