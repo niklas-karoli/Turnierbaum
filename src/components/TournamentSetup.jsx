@@ -47,6 +47,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
 
   // Derived mode & teamSize
   const mode = formatOption === '1v1' ? 'solo' : 'team';
+  const teamSize = formatOption || '2v2';
 
   // Determine required member count based on format
   const getExpectedMemberCount = (fmt) => {
