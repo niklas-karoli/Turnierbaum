@@ -6,9 +6,7 @@ import {
   ListFilter,
   History,
   Sparkles,
-  ChevronRight,
   Play,
-  RotateCcw,
 } from 'lucide-react';
 
 import { Header } from './components/Header';
@@ -18,9 +16,7 @@ import { BracketView } from './components/BracketView';
 import { StandingsView } from './components/StandingsView';
 import { FieldsView } from './components/FieldsView';
 import { MatchListView } from './components/MatchListView';
-import { BeamerView } from './components/BeamerView';
 import { RandomToolsModal } from './components/RandomToolsModal';
-import { QrShareModal } from './components/QrShareModal';
 import { ActivityLogView } from './components/ActivityLogView';
 
 import { saveToLocalStorage, loadFromLocalStorage, exportToJsonFile, importFromJsonFile } from './utils/storage';
@@ -44,15 +40,10 @@ export default function App() {
   // Active View Tab: 'bracket' | 'standings' | 'fields' | 'matches' | 'log'
   const [activeTab, setActiveTab] = useState('bracket');
 
-  // Theme
-  const [theme, setTheme] = useState('dark');
-
   // Modals state
   const [showWizard, setShowWizard] = useState(!tournament);
   const [selectedMatch, setSelectedMatch] = useState(null);
-  const [showBeamer, setShowBeamer] = useState(false);
   const [showRandomTools, setShowRandomTools] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
 
   // Auto-save to localStorage whenever tournament state updates
   useEffect(() => {
@@ -150,8 +141,16 @@ export default function App() {
     }
   };
 
+  // Generic direct state update without adding to undo stack for smooth timer ticks
+  const handleUpdateTournamentDirect = (updatedTournament) => {
+    setHistory((prev) => ({
+      ...prev,
+      present: updatedTournament,
+    }));
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100 selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white font-sans">
       {/* Header Bar */}
       <Header
         tournament={tournament}
@@ -160,11 +159,7 @@ export default function App() {
         onImportJson={handleImportJson}
         onUndo={handleUndo}
         canUndo={!!(history && history.past.length > 0)}
-        onOpenBeamerMode={() => setShowBeamer(true)}
         onOpenRandomTools={() => setShowRandomTools(true)}
-        onOpenQrModal={() => setShowQrModal(true)}
-        theme={theme}
-        onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
       />
 
       {/* Main Container */}
@@ -172,20 +167,19 @@ export default function App() {
         {!tournament ? (
           /* Empty State Landing */
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 max-w-lg mx-auto">
-            <div className="p-5 bg-indigo-600/20 text-indigo-400 rounded-3xl border border-indigo-500/30 shadow-2xl">
-              <Trophy className="w-16 h-16" />
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
+              <Trophy className="w-12 h-12 text-indigo-400" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-black text-white">Willkommen beim TurnierManager Pro</h2>
-              <p className="text-sm text-slate-400">
-                Die universelle, interaktive Turnierverwaltungs-Software für Sport, Gaming,
-                Brettspiele und Partyspiele.
+              <h2 className="text-2xl font-bold tracking-tight text-white">Willkommen beim TurnierManager Pro</h2>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Moderne, universelle Turnierverwaltung für Sport, Esports, Brettspiele und Firmenevents.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full">
               <button
                 onClick={() => setShowWizard(true)}
-                className="flex-1 py-3 px-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 transition flex items-center justify-center gap-2 text-sm"
+                className="flex-1 py-3 px-6 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Neues Turnier erstellen</span>
@@ -196,19 +190,19 @@ export default function App() {
           <>
             {/* View Tab Selector Bar */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
-              <div className="flex bg-slate-800/80 p-1 rounded-2xl border border-slate-700/80 text-xs font-semibold">
+              <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-medium">
                 {(tournament.system === TOURNAMENT_SYSTEMS.SINGLE_ELIMINATION ||
                   tournament.system === TOURNAMENT_SYSTEMS.DOUBLE_ELIMINATION ||
                   tournament.system === TOURNAMENT_SYSTEMS.HYBRID) && (
                   <button
                     onClick={() => setActiveTab('bracket')}
-                    className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                       activeTab === 'bracket'
-                        ? 'bg-indigo-600 text-white shadow'
+                        ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <Trophy className="w-3.5 h-3.5" />
+                    <Trophy className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Turnierbaum</span>
                   </button>
                 )}
@@ -218,50 +212,50 @@ export default function App() {
                   tournament.system === TOURNAMENT_SYSTEMS.SWISS) && (
                   <button
                     onClick={() => setActiveTab('standings')}
-                    className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                       activeTab === 'standings'
-                        ? 'bg-indigo-600 text-white shadow'
+                        ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Tabelle / Standings</span>
+                    <span>Tabelle</span>
                   </button>
                 )}
 
                 <button
                   onClick={() => setActiveTab('fields')}
-                  className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                     activeTab === 'fields'
-                      ? 'bg-indigo-600 text-white shadow'
+                      ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <LayoutGrid className="w-3.5 h-3.5 text-slate-300" />
                   <span>Spielfelder ({tournament.fields?.length || 0})</span>
                 </button>
 
                 <button
                   onClick={() => setActiveTab('matches')}
-                  className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                     activeTab === 'matches'
-                      ? 'bg-indigo-600 text-white shadow'
+                      ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <ListFilter className="w-3.5 h-3.5" />
+                  <ListFilter className="w-3.5 h-3.5 text-slate-300" />
                   <span>Spielplan</span>
                 </button>
 
                 <button
                   onClick={() => setActiveTab('log')}
-                  className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                     activeTab === 'log'
-                      ? 'bg-indigo-600 text-white shadow'
+                      ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <History className="w-3.5 h-3.5" />
+                  <History className="w-3.5 h-3.5 text-slate-300" />
                   <span>Historie</span>
                 </button>
               </div>
@@ -271,7 +265,7 @@ export default function App() {
                 tournament.currentRound < tournament.totalRounds && (
                   <button
                     onClick={handleGenerateNextSwissRound}
-                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow"
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs rounded-lg flex items-center gap-1.5 transition shadow-sm"
                   >
                     <Play className="w-3.5 h-3.5 fill-current" />
                     <span>Nächste Swiss Runde generieren</span>
@@ -289,18 +283,24 @@ export default function App() {
                       matches={tournament.matches}
                       onSelectMatch={(m) => setSelectedMatch(m)}
                       bracketTitle="Winner-Bracket (Gewinner)"
+                      tournament={tournament}
+                      onUpdateTournament={handleUpdateTournamentDirect}
                     />
                     <BracketView
                       rounds={tournament.rounds.filter((r) => r.bracketType === 'loser')}
                       matches={tournament.matches}
                       onSelectMatch={(m) => setSelectedMatch(m)}
                       bracketTitle="Loser-Bracket (Verlierer)"
+                      tournament={tournament}
+                      onUpdateTournament={handleUpdateTournamentDirect}
                     />
                     <BracketView
                       rounds={tournament.rounds.filter((r) => r.bracketType === 'grand_final')}
                       matches={tournament.matches}
                       onSelectMatch={(m) => setSelectedMatch(m)}
                       bracketTitle="Grand Final (Finale)"
+                      tournament={tournament}
+                      onUpdateTournament={handleUpdateTournamentDirect}
                     />
                   </div>
                 ) : tournament.system === TOURNAMENT_SYSTEMS.HYBRID ? (
@@ -310,16 +310,18 @@ export default function App() {
                       matches={tournament.playoffMatches}
                       onSelectMatch={(m) => setSelectedMatch(m)}
                       bracketTitle="Playoff K.-o.-Baum"
+                      tournament={tournament}
+                      onUpdateTournament={handleUpdateTournamentDirect}
                     />
                   ) : (
-                    <div className="p-6 bg-slate-800/80 border border-slate-700/80 rounded-2xl text-center space-y-3">
-                      <p className="text-sm font-semibold text-slate-300">
+                    <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-3">
+                      <p className="text-sm font-medium text-slate-300">
                         Gruppenphase läuft aktuell. Sobald alle Gruppenspiele beendet sind, wird
                         der K.-o.-Turnierbaum automatisch generiert!
                       </p>
                       <button
                         onClick={() => setActiveTab('standings')}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition"
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-xl transition"
                       >
                         Zu den Gruppentabellen
                       </button>
@@ -330,6 +332,8 @@ export default function App() {
                     rounds={tournament.rounds}
                     matches={tournament.matches}
                     onSelectMatch={(m) => setSelectedMatch(m)}
+                    tournament={tournament}
+                    onUpdateTournament={handleUpdateTournamentDirect}
                   />
                 )}
               </div>
@@ -341,6 +345,7 @@ export default function App() {
               <FieldsView
                 tournament={tournament}
                 onSelectMatch={(m) => setSelectedMatch(m)}
+                onUpdateTournament={handleUpdateTournamentDirect}
               />
             )}
 
@@ -348,6 +353,7 @@ export default function App() {
               <MatchListView
                 tournament={tournament}
                 onSelectMatch={(m) => setSelectedMatch(m)}
+                onUpdateTournament={handleUpdateTournamentDirect}
               />
             )}
 
@@ -366,14 +372,12 @@ export default function App() {
 
       {selectedMatch && (
         <ScoreboardModal
+          tournament={tournament}
           match={selectedMatch}
           onSaveResult={handleSaveMatchResult}
+          onUpdateTournament={handleUpdateTournamentDirect}
           onClose={() => setSelectedMatch(null)}
         />
-      )}
-
-      {showBeamer && tournament && (
-        <BeamerView tournament={tournament} onClose={() => setShowBeamer(false)} />
       )}
 
       {showRandomTools && tournament && (
@@ -381,10 +385,6 @@ export default function App() {
           teams={tournament.teams}
           onClose={() => setShowRandomTools(false)}
         />
-      )}
-
-      {showQrModal && tournament && (
-        <QrShareModal tournament={tournament} onClose={() => setShowQrModal(false)} />
       )}
     </div>
   );

@@ -2,25 +2,25 @@
 
 @layer base {
   body {
-    @apply bg-slate-900 text-slate-100 antialiased min-h-screen selection:bg-indigo-500 selection:text-white;
+    @apply bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-indigo-500 selection:text-white font-sans;
   }
 }
 
-/* Custom scrollbar styling for tournament brackets */
+/* Modern minimalist custom scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.8);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.8);
-  border-radius: 4px;
+  background: rgba(51, 65, 85, 0.6);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 1);
+  background: rgba(71, 85, 105, 0.9);
 }
