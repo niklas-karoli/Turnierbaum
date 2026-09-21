@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, CheckCircle, Play, Pause } from 'lucide-react';
+import { Trophy, CheckCircle, Play, Pause, Lock } from 'lucide-react';
 import { MATCH_STATUS } from '../types';
 import {
   getMatchRemainingSeconds,
   formatTimerDisplay,
   toggleMatchTimerInTournament,
 } from '../utils/timer';
+import { getMatchLockStatus } from '../utils/playerMapping';
 
 export const BracketView = ({
   rounds,
@@ -13,6 +14,8 @@ export const BracketView = ({
   onSelectMatch,
   bracketTitle = 'Turnierbaum',
   tournament,
+  tournaments = [tournament],
+  playerMappings = [],
   onUpdateTournament,
 }) => {
   const isAnyRunning = matches?.some((m) => m.isTimerRunning);
@@ -67,6 +70,8 @@ export const BracketView = ({
                       match={match}
                       onSelectMatch={onSelectMatch}
                       tournament={tournament}
+                      tournaments={tournaments}
+                      playerMappings={playerMappings}
                       onUpdateTournament={onUpdateTournament}
                     />
                   ))}
@@ -80,11 +85,22 @@ export const BracketView = ({
   );
 };
 
-const MatchCard = ({ match, onSelectMatch, tournament, onUpdateTournament }) => {
+const MatchCard = ({
+  match,
+  onSelectMatch,
+  tournament,
+  tournaments = [tournament],
+  playerMappings = [],
+  onUpdateTournament,
+}) => {
   const isBye = Boolean(match.isBye);
   const isCompleted = match.status === MATCH_STATUS.COMPLETED;
   const isOngoing = match.status === MATCH_STATUS.ONGOING;
   const isReady = match.status === MATCH_STATUS.READY;
+
+  const lockStatus = tournament
+    ? getMatchLockStatus(match, tournament.id, tournaments, playerMappings)
+    : { isLocked: false, reason: null };
 
   const t1Winner = isCompleted && match.winnerId === match.team1?.id;
   const t2Winner = isCompleted && match.winnerId === match.team2?.id;
@@ -133,11 +149,21 @@ const MatchCard = ({ match, onSelectMatch, tournament, onUpdateTournament }) => 
           ? 'border-indigo-500/80 ring-1 ring-indigo-500/20'
           : isCompleted
           ? 'border-slate-800'
+          : lockStatus.isLocked
+          ? 'border-amber-500/60 bg-amber-950/10'
           : isReady
           ? 'border-slate-800 hover:bg-slate-800/50'
           : 'border-slate-800/60 opacity-60 cursor-not-allowed'
       }`}
     >
+      {/* Lock Indicator Bar */}
+      {lockStatus.isLocked && (
+        <div className="mb-2 p-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-1.5 text-[10px] text-amber-300 font-medium">
+          <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+          <span className="truncate">{lockStatus.reason}</span>
+        </div>
+      )}
+
       {/* Match Title Badge if named (e.g. Spiel um Platz 3) */}
       {match.name && (
         <div className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider mb-1">
