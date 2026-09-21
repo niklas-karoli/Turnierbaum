@@ -32,7 +32,12 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
   const [fieldCount, setFieldCount] = useState(2);
   const [seeded, setSeeded] = useState(false);
 
-  // Advanced Rules
+  // Advanced Rules & Timer
+  const [timerMinutes, setTimerMinutes] = useState(10);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [enableThirdPlaceMatch, setEnableThirdPlaceMatch] = useState(true);
+  const [enableConsolationRound, setEnableConsolationRound] = useState(false);
+
   const [pointsWin, setPointsWin] = useState(3);
   const [pointsDraw, setPointsDraw] = useState(1);
   const [pointsLoss, setPointsLoss] = useState(0);
@@ -110,6 +115,13 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
     };
 
     const initialFields = initializeFields(Number(fieldCount));
+    const defaultTimerDuration = Math.max(10, (Number(timerMinutes) || 0) * 60 + (Number(timerSeconds) || 0));
+
+    const options = {
+      enableThirdPlaceMatch: Boolean(enableThirdPlaceMatch),
+      enableConsolationRound: Boolean(enableConsolationRound),
+      defaultTimerDuration,
+    };
 
     let tournamentData = {
       id: `tourney_${Date.now()}`,
@@ -119,33 +131,43 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
       system,
       seeded,
       rules,
+      options,
       teams,
       fields: initialFields,
+      defaultTimerDuration,
       createdAt: new Date().toISOString(),
+    };
+
+    const applyTimerDuration = (matchesList) => {
+      return matchesList.map((m) => ({
+        ...m,
+        timerDuration: m.timerDuration ?? defaultTimerDuration,
+        timerRemaining: m.timerRemaining ?? defaultTimerDuration,
+      }));
     };
 
     // Generate bracket or fixtures based on system
     if (system === TOURNAMENT_SYSTEMS.SINGLE_ELIMINATION) {
-      const generated = generateSingleElimination(teams, seeded);
-      tournamentData.matches = generated.matches;
+      const generated = generateSingleElimination(teams, seeded, options);
+      tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.rounds = generated.rounds;
     } else if (system === TOURNAMENT_SYSTEMS.DOUBLE_ELIMINATION) {
-      const generated = generateDoubleElimination(teams, seeded);
-      tournamentData.matches = generated.matches;
+      const generated = generateDoubleElimination(teams, seeded, options);
+      tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.rounds = generated.rounds;
     } else if (system === TOURNAMENT_SYSTEMS.ROUND_ROBIN) {
       const generated = generateRoundRobin(teams);
-      tournamentData.matches = generated.matches;
+      tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.rounds = generated.rounds;
     } else if (system === TOURNAMENT_SYSTEMS.HYBRID) {
       const generated = generateHybrid(teams, Number(groupCount), Number(advancingPerGroup));
       tournamentData.groups = generated.groups;
-      tournamentData.matches = generated.matches;
+      tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.advancingPerGroup = generated.advancingPerGroup;
       tournamentData.stage = generated.stage;
     } else if (system === TOURNAMENT_SYSTEMS.SWISS) {
       const generated = generateSwissInitial(teams, Number(swissRounds));
-      tournamentData.matches = generated.matches;
+      tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.rounds = generated.rounds;
       tournamentData.currentRound = generated.currentRound;
       tournamentData.totalRounds = generated.totalRounds;
@@ -368,6 +390,76 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
                   />
                   <p className="text-xs text-slate-400 mt-1">Empfohlen für {teams.length} Teams: {getRecommendedSwissRounds(teams.length)} Runden</p>
+                </div>
+              )}
+
+              {/* Standard Timer Config */}
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                <span className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Standard Spieldauer (Match-Timer)
+                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      max="120"
+                      value={timerMinutes}
+                      onChange={(e) => setTimerMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-16 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs text-center font-mono"
+                    />
+                    <span className="text-xs text-slate-400">Min.</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={timerSeconds}
+                      onChange={(e) => setTimerSeconds(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                      className="w-16 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs text-center font-mono"
+                    />
+                    <span className="text-xs text-slate-400">Sek.</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 ml-2">
+                    Startwert für den Timer aller Spiele ({timerMinutes}m {timerSeconds.toString().padStart(2, '0')}s)
+                  </p>
+                </div>
+              </div>
+
+              {/* Bracket Options (Single & Double Elimination) */}
+              {(system === TOURNAMENT_SYSTEMS.SINGLE_ELIMINATION || system === TOURNAMENT_SYSTEMS.DOUBLE_ELIMINATION) && (
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <span className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Turnierbaum & Platzierungsspiele
+                  </span>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium text-xs text-slate-200">Spiel um Platz 3 aktivieren</span>
+                      <p className="text-[11px] text-slate-400">Kleines Finale zwischen den Halbfinal-Verlierern</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={enableThirdPlaceMatch}
+                      onChange={(e) => setEnableThirdPlaceMatch(e.target.checked)}
+                      className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {system === TOURNAMENT_SYSTEMS.SINGLE_ELIMINATION && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                      <div>
+                        <span className="font-medium text-xs text-slate-200">Trostrunde / Platzierungsspiele (R1)</span>
+                        <p className="text-[11px] text-slate-400">Platzierungsspiele für in Runde 1 ausgeschiedene Teams</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={enableConsolationRound}
+                        onChange={(e) => setEnableConsolationRound(e.target.checked)}
+                        className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

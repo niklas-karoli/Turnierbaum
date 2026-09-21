@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle, Play, Pause } from 'lucide-react';
+import { Trophy, CheckCircle, Play, Pause } from 'lucide-react';
 import { MATCH_STATUS } from '../types';
 import {
   getMatchRemainingSeconds,
@@ -16,7 +16,7 @@ export const BracketView = ({
   onUpdateTournament,
 }) => {
   const isAnyRunning = matches?.some((m) => m.isTimerRunning);
-  const [now, setNow] = useState(Date.now());
+  const [, setNow] = useState(0);
 
   useEffect(() => {
     if (isAnyRunning) {
@@ -81,6 +81,7 @@ export const BracketView = ({
 };
 
 const MatchCard = ({ match, onSelectMatch, tournament, onUpdateTournament }) => {
+  const isBye = Boolean(match.isBye);
   const isCompleted = match.status === MATCH_STATUS.COMPLETED;
   const isOngoing = match.status === MATCH_STATUS.ONGOING;
   const isReady = match.status === MATCH_STATUS.READY;
@@ -98,6 +99,32 @@ const MatchCard = ({ match, onSelectMatch, tournament, onUpdateTournament }) => 
     }
   };
 
+  if (isBye) {
+    const advancingTeam = match.team1 || match.team2;
+    return (
+      <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 opacity-75 space-y-2">
+        <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
+          <span>Freilos (Bye)</span>
+          <span className="text-indigo-400/80">Auto-Vorrücken</span>
+        </div>
+        <div className="flex items-center justify-between p-1.5 bg-slate-900/60 rounded-lg border border-slate-800/50">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div
+              className="w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: advancingTeam?.color || '#475569' }}
+            />
+            <span className="text-xs text-slate-300 font-medium truncate">
+              {advancingTeam ? advancingTeam.name : 'Kein Gegner'}
+            </span>
+          </div>
+          <span className="text-[10px] bg-indigo-950 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-800/50 font-semibold">
+            R2
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       onClick={() => (isReady || isOngoing || isCompleted) && onSelectMatch(match)}
@@ -111,6 +138,12 @@ const MatchCard = ({ match, onSelectMatch, tournament, onUpdateTournament }) => 
           : 'border-slate-800/60 opacity-60 cursor-not-allowed'
       }`}
     >
+      {/* Match Title Badge if named (e.g. Spiel um Platz 3) */}
+      {match.name && (
+        <div className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider mb-1">
+          {match.name}
+        </div>
+      )}
       {/* Field Badge */}
       {match.fieldId && (
         <span className="absolute -top-2.5 right-3 text-[10px] font-semibold bg-slate-800 text-indigo-300 border border-slate-700 px-2 py-0.5 rounded-md shadow-sm">

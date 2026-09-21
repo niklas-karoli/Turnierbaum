@@ -23,8 +23,6 @@ export const ScoreboardModal = ({
   onUpdateTournament,
   onClose,
 }) => {
-  if (!match) return null;
-
   // Retrieve latest match state from tournament
   const allMatches = tournament
     ? tournament.system === 'hybrid' && tournament.playoffMatches
@@ -32,22 +30,28 @@ export const ScoreboardModal = ({
       : tournament.matches || []
     : [];
 
-  const currentMatch = allMatches.find((m) => m.id === match.id) || match;
+  const currentMatch = match ? (allMatches.find((m) => m.id === match.id) || match) : null;
 
-  const [score1, setScore1] = useState(currentMatch.score1 ?? 0);
-  const [score2, setScore2] = useState(currentMatch.score2 ?? 0);
+  const [score1, setScore1] = useState(currentMatch?.score1 ?? 0);
+  const [score2, setScore2] = useState(currentMatch?.score2 ?? 0);
+
+  const initialDuration = currentMatch?.timerDuration ?? tournament?.defaultTimerDuration ?? 600;
+  const [customMin, setCustomMin] = useState(Math.floor(initialDuration / 60));
+  const [customSec, setCustomSec] = useState(initialDuration % 60);
 
   // Tick state to force re-render every second when timer is running
-  const [now, setNow] = useState(Date.now());
+  const [, setNow] = useState(0);
 
   useEffect(() => {
-    if (currentMatch.isTimerRunning) {
+    if (currentMatch?.isTimerRunning) {
       const interval = setInterval(() => {
         setNow(Date.now());
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [currentMatch.isTimerRunning]);
+  }, [currentMatch?.isTimerRunning]);
+
+  if (!match || !currentMatch) return null;
 
   const remainingSeconds = getMatchRemainingSeconds(currentMatch);
 
@@ -62,6 +66,11 @@ export const ScoreboardModal = ({
   const handleResetTimer = (seconds = 600) => {
     const updated = resetMatchTimerInTournament(tournament, currentMatch.id, seconds);
     onUpdateTournament(updated);
+  };
+
+  const handleApplyCustomTimer = () => {
+    const totalSec = Math.max(1, (Number(customMin) || 0) * 60 + (Number(customSec) || 0));
+    handleResetTimer(totalSec);
   };
 
   const handleSave = () => {
@@ -186,19 +195,19 @@ export const ScoreboardModal = ({
             {/* Presets & Sound */}
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => handleResetTimer(300)}
+                onClick={() => { setCustomMin(5); setCustomSec(0); handleResetTimer(300); }}
                 className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg border border-slate-700 transition"
               >
                 5m
               </button>
               <button
-                onClick={() => handleResetTimer(600)}
+                onClick={() => { setCustomMin(10); setCustomSec(0); handleResetTimer(600); }}
                 className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg border border-slate-700 transition"
               >
                 10m
               </button>
               <button
-                onClick={() => handleResetTimer(900)}
+                onClick={() => { setCustomMin(15); setCustomSec(0); handleResetTimer(900); }}
                 className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg border border-slate-700 transition"
               >
                 15m
@@ -209,6 +218,38 @@ export const ScoreboardModal = ({
                 title="Buzzer"
               >
                 <Volume2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Duration Input */}
+          <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between gap-3 text-xs">
+            <span className="text-slate-400 font-medium shrink-0">Benutzerdefinierte Spieldauer:</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  max="120"
+                  value={customMin}
+                  onChange={(e) => setCustomMin(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-12 bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-slate-100 text-center font-mono text-xs focus:outline-none focus:border-indigo-500"
+                />
+                <span className="text-slate-500 font-bold">:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={customSec}
+                  onChange={(e) => setCustomSec(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                  className="w-12 bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-slate-100 text-center font-mono text-xs focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <button
+                onClick={handleApplyCustomTimer}
+                className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition text-xs"
+              >
+                Übernehmen
               </button>
             </div>
           </div>

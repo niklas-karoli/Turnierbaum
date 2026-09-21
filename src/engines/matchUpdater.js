@@ -9,7 +9,6 @@ import { checkAndGeneratePlayoffs } from './hybrid';
  * Updates a match result and auto-advances winners/losers
  */
 export const updateMatchResult = (tournament, matchId, score1, score2) => {
-  const isDraw = score1 === score2;
   const targetMatch = findMatchById(tournament, matchId);
 
   if (!targetMatch) {
