@@ -6,16 +6,21 @@ import {
   AlertCircle,
   X,
   UserCheck,
+  Shuffle,
+  Sparkles,
 } from 'lucide-react';
 import { getTeamPlayerNames } from '../utils/playerMapping';
+import { calculateCollisionScore } from '../utils/scheduleOptimizer';
 
 export const ParallelTournamentModal = ({
   tournaments = [],
   activeTournamentId,
   playerMappings = [],
   onUpdatePlayerMappings,
+  onReshuffleSchedules,
   onClose,
 }) => {
+  const currentCollisionCount = calculateCollisionScore(tournaments, playerMappings);
   const activeTournament = tournaments.find((t) => t.id === activeTournamentId) || tournaments[0];
   const otherTournaments = tournaments.filter((t) => t.id !== activeTournament?.id);
 
@@ -127,6 +132,38 @@ export const ParallelTournamentModal = ({
 
         {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Collision Warning & Re-Shuffle Action Bar */}
+          {tournaments.length >= 2 && playerMappings.length > 0 && (
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2 text-xs">
+                {currentCollisionCount > 0 ? (
+                  <>
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="text-amber-300 font-medium">
+                      Achtung: {currentCollisionCount} zeitliche Überschneidung(en) in den Runden erkannt.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="text-emerald-300 font-medium">
+                      Optimaler Spielplan: Keine zeitlichen Runden-Überschneidungen!
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {onReshuffleSchedules && (
+                <button
+                  onClick={onReshuffleSchedules}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                >
+                  <Shuffle className="w-3.5 h-3.5" />
+                  <span>Spielplan bei Überschneidungen neu mischen</span>
+                </button>
+              )}
+            </div>
+          )}
           {tournaments.length < 2 ? (
             <div className="p-6 bg-slate-950 border border-slate-800 rounded-xl text-center space-y-3">
               <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />

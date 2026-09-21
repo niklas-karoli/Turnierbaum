@@ -188,6 +188,13 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
       return;
     }
 
+    // Default random initial seeding unless seeded mode is explicitly checked
+    let teamsToUse = [...teams];
+    if (!seeded) {
+      teamsToUse = [...teamsToUse].sort(() => Math.random() - 0.5);
+      teamsToUse = teamsToUse.map((t, idx) => ({ ...t, seed: idx + 1 }));
+    }
+
     const rules = {
       pointsWin: Number(pointsWin),
       pointsDraw: Number(pointsDraw),
@@ -212,7 +219,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
       seeded,
       rules,
       options,
-      teams,
+      teams: teamsToUse,
       fields: initialFields,
       defaultTimerDuration,
       createdAt: new Date().toISOString(),
@@ -228,25 +235,25 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
 
     // Generate bracket or fixtures based on system
     if (system === TOURNAMENT_SYSTEMS.SINGLE_ELIMINATION) {
-      const generated = generateSingleElimination(teams, seeded, options);
+      const generated = generateSingleElimination(teamsToUse, seeded, options);
       tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.rounds = generated.rounds;
     } else if (system === TOURNAMENT_SYSTEMS.DOUBLE_ELIMINATION) {
-      const generated = generateDoubleElimination(teams, seeded, options);
+      const generated = generateDoubleElimination(teamsToUse, seeded, options);
       tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.rounds = generated.rounds;
     } else if (system === TOURNAMENT_SYSTEMS.ROUND_ROBIN) {
-      const generated = generateRoundRobin(teams);
+      const generated = generateRoundRobin(teamsToUse);
       tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.rounds = generated.rounds;
     } else if (system === TOURNAMENT_SYSTEMS.HYBRID) {
-      const generated = generateHybrid(teams, Number(groupCount), Number(advancingPerGroup));
+      const generated = generateHybrid(teamsToUse, Number(groupCount), Number(advancingPerGroup));
       tournamentData.groups = generated.groups;
       tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.advancingPerGroup = generated.advancingPerGroup;
       tournamentData.stage = generated.stage;
     } else if (system === TOURNAMENT_SYSTEMS.SWISS) {
-      const generated = generateSwissInitial(teams, Number(swissRounds));
+      const generated = generateSwissInitial(teamsToUse, Number(swissRounds));
       tournamentData.matches = applyTimerDuration(generated.matches);
       tournamentData.rounds = generated.rounds;
       tournamentData.currentRound = generated.currentRound;

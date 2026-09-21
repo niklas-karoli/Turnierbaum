@@ -56,34 +56,56 @@ export const autoAssignFields = (
     ? [...tournament.matches, ...tournament.playoffMatches]
     : [...tournament.matches];
 
-  const updatedFields = [...tournament.fields];
-  const updatedMatches = matches.map((m) => ({ ...m }));
+  let updatedFields = tournament.fields.map((f) => ({ ...f }));
+  let updatedMatches = matches.map((m) => ({ ...m }));
 
-  // Collect teams currently active on a field in this tournament
+  // 1. Sanitize fields & matches:
+  // Clean up completed/missing matches from fields
+  updatedFields.forEach((field, idx) => {
+    if (field.currentMatchId) {
+      const activeMatch = updatedMatches.find((m) => m.id === field.currentMatchId);
+      if (!activeMatch || activeMatch.status === MATCH_STATUS.COMPLETED) {
+        updatedFields[idx] = { ...field, currentMatchId: null, status: 'free' };
+      }
+    }
+  });
+
+  // Revert orphan 'ONGOING' matches that are not held by any field in updatedFields
+  const activeFieldMatchIds = new Set(
+    updatedFields.map((f) => f.currentMatchId).filter(Boolean)
+  );
+
+  updatedMatches = updatedMatches.map((m) => {
+    if (m.status === MATCH_STATUS.ONGOING) {
+      if (!activeFieldMatchIds.has(m.id)) {
+        // Revert to READY or PENDING
+        const isReady = Boolean(m.team1 && m.team2);
+        return {
+          ...m,
+          status: isReady ? MATCH_STATUS.READY : MATCH_STATUS.PENDING,
+          fieldId: null,
+          isTimerRunning: false,
+        };
+      }
+    }
+    return m;
+  });
+
+  // 2. Collect teams currently active on a field in this tournament
   const busyTeamIds = new Set();
   updatedMatches.forEach((m) => {
-    if (m.status === MATCH_STATUS.ONGOING) {
+    if (m.status === MATCH_STATUS.ONGOING && activeFieldMatchIds.has(m.id)) {
       if (m.team1) busyTeamIds.add(m.team1.id);
       if (m.team2) busyTeamIds.add(m.team2.id);
     }
   });
 
-  // Assign free fields to eligible ready matches based on schedule priority
+  // 3. Assign free fields to eligible ready matches based on schedule priority
   updatedFields.forEach((field, fIdx) => {
-    // Check if currently assigned match on field is completed
-    if (field.currentMatchId) {
-      const activeMatch = updatedMatches.find((m) => m.id === field.currentMatchId);
-      if (!activeMatch || activeMatch.status === MATCH_STATUS.COMPLETED) {
-        updatedFields[fIdx] = { ...field, currentMatchId: null, status: 'free' };
-      }
-    }
-
-    // If field is free, assign next ready match by schedule order
     if (!updatedFields[fIdx].currentMatchId) {
-      // Get all READY candidate matches
+      // Find candidate matches with status READY
       const candidateMatches = updatedMatches.filter((m) => {
         if (m.status !== MATCH_STATUS.READY) return false;
-        if (m.fieldId && m.fieldId !== field.id) return false;
         if (!m.team1 || !m.team2) return false;
 
         // Check if either team is busy in this tournament
@@ -114,9 +136,17 @@ export const autoAssignFields = (
         const matchIndex = updatedMatches.findIndex((m) => m.id === nextMatch.id);
 
         if (matchIndex !== -1) {
-          updatedMatches[matchIndex].status = MATCH_STATUS.ONGOING;
-          updatedMatches[matchIndex].fieldId = field.id;
-          updatedFields[fIdx] = { ...field, currentMatchId: nextMatch.id, status: 'busy' };
+          updatedMatches[matchIndex] = {
+            ...updatedMatches[matchIndex],
+            status: MATCH_STATUS.ONGOING,
+            fieldId: field.id,
+          };
+
+          updatedFields[fIdx] = {
+            ...field,
+            currentMatchId: nextMatch.id,
+            status: 'busy',
+          };
 
           busyTeamIds.add(nextMatch.team1.id);
           busyTeamIds.add(nextMatch.team2.id);

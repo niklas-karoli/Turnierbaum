@@ -6,6 +6,7 @@ import {
   toggleMatchTimerInTournament,
 } from '../utils/timer';
 import { getMatchLockStatus } from '../utils/playerMapping';
+import { TeamNameDisplay } from './TeamNameDisplay';
 
 export const FieldsView = ({
   tournament,
@@ -108,12 +109,10 @@ export const FieldsView = ({
                     <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-2.5 h-2.5 rounded-full"
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: activeMatch.team1?.color || '#3b82f6' }}
                         />
-                        <span className="font-semibold text-xs text-slate-200">
-                          {activeMatch.team1?.name}
-                        </span>
+                        <TeamNameDisplay team={activeMatch.team1} />
                       </div>
                       <span className="font-mono font-bold text-indigo-400 text-sm">
                         {activeMatch.score1 ?? '-'}
@@ -123,12 +122,10 @@ export const FieldsView = ({
                     <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-2.5 h-2.5 rounded-full"
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: activeMatch.team2?.color || '#ef4444' }}
                         />
-                        <span className="font-semibold text-xs text-slate-200">
-                          {activeMatch.team2?.name}
-                        </span>
+                        <TeamNameDisplay team={activeMatch.team2} />
                       </div>
                       <span className="font-mono font-bold text-indigo-400 text-sm">
                         {activeMatch.score2 ?? '-'}

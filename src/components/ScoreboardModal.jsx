@@ -15,6 +15,7 @@ import {
   toggleMatchTimerInTournament,
   resetMatchTimerInTournament,
 } from '../utils/timer';
+import { TeamNameDisplay } from './TeamNameDisplay';
 
 export const ScoreboardModal = ({
   tournament,
@@ -102,14 +103,17 @@ export const ScoreboardModal = ({
           <div className="grid grid-cols-5 items-center gap-2 bg-slate-950 p-6 rounded-2xl border border-slate-800 shadow-inner">
             {/* Team 1 Score */}
             <div className="col-span-2 text-center space-y-3">
-              <div className="flex items-center justify-center gap-2">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: currentMatch.team1?.color || '#3b82f6' }}
-                />
-                <span className="font-bold text-sm text-slate-100 truncate max-w-[120px]">
-                  {currentMatch.team1 ? currentMatch.team1.name : 'TBD'}
-                </span>
+              <div className="flex flex-col items-center justify-center gap-1">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: currentMatch.team1?.color || '#3b82f6' }}
+                  />
+                  <TeamNameDisplay
+                    team={currentMatch.team1}
+                    nameClassName="font-bold text-sm text-slate-100"
+                  />
+                </div>
               </div>
               <div className="text-4xl font-black font-mono tracking-tight text-indigo-400 my-2">
                 {score1}
@@ -137,14 +141,17 @@ export const ScoreboardModal = ({
 
             {/* Team 2 Score */}
             <div className="col-span-2 text-center space-y-3">
-              <div className="flex items-center justify-center gap-2">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: currentMatch.team2?.color || '#ef4444' }}
-                />
-                <span className="font-bold text-sm text-slate-100 truncate max-w-[120px]">
-                  {currentMatch.team2 ? currentMatch.team2.name : 'TBD'}
-                </span>
+              <div className="flex flex-col items-center justify-center gap-1">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: currentMatch.team2?.color || '#ef4444' }}
+                  />
+                  <TeamNameDisplay
+                    team={currentMatch.team2}
+                    nameClassName="font-bold text-sm text-slate-100"
+                  />
+                </div>
               </div>
               <div className="text-4xl font-black font-mono tracking-tight text-indigo-400 my-2">
                 {score2}

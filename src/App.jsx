@@ -26,6 +26,7 @@ import { updateMatchResult } from './engines/matchUpdater';
 import { autoAssignFieldsAllTournaments } from './engines/fieldScheduler';
 import { generateNextSwissRound } from './engines/swiss';
 import { TOURNAMENT_SYSTEMS } from './types';
+import { optimizeAndReshuffleSchedules } from './utils/scheduleOptimizer';
 
 export default function App() {
   const [history, setHistory] = useState(() => {
@@ -122,6 +123,26 @@ export default function App() {
       'Personen-Verknüpfungen aktualisiert.'
     );
     setHistory(newHistory);
+  };
+
+  // Handle Reshuffle Schedules when collisions detected
+  const handleReshuffleSchedules = () => {
+    if (!appState || tournaments.length < 2) return;
+
+    const result = optimizeAndReshuffleSchedules(tournaments, playerMappings);
+
+    const nextAppState = {
+      ...appState,
+      tournaments: result.tournaments,
+    };
+
+    const newHistory = recordState(
+      history,
+      nextAppState,
+      `Spielplan neu gemischt: ${result.message}`
+    );
+    setHistory(newHistory);
+    alert(result.message);
   };
 
   // Handle Match Score Save
@@ -503,6 +524,7 @@ export default function App() {
           activeTournamentId={activeTournamentId}
           playerMappings={playerMappings}
           onUpdatePlayerMappings={handleUpdatePlayerMappings}
+          onReshuffleSchedules={handleReshuffleSchedules}
           onClose={() => setShowParallelModal(false)}
         />
       )}

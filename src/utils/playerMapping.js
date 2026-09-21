@@ -81,27 +81,34 @@ export const getAllActivePlayerLocks = (allTournaments = []) => {
       ? [...tourney.matches, ...tourney.playoffMatches]
       : tourney.matches;
 
-    const fieldsMap = new Map((tourney.fields || []).map((f) => [f.id, f.name]));
+    const fields = tourney.fields || [];
 
     matches.forEach((m) => {
-      if (m.status === MATCH_STATUS.ONGOING) {
-        const fieldName = fieldsMap.get(m.fieldId) || m.fieldId || 'Spielfeld';
+      // Only lock if status is ONGOING AND m is assigned to an active field
+      if (m.status === MATCH_STATUS.ONGOING && m.fieldId) {
+        const activeField = fields.find(
+          (f) => f.id === m.fieldId && f.currentMatchId === m.id
+        );
 
-        [m.team1, m.team2].forEach((team) => {
-          if (!team) return;
-          const playerNames = getTeamPlayerNames(team);
-          playerNames.forEach((playerName) => {
-            activeLocks.push({
-              tournamentId: tourney.id,
-              tournamentName: tourney.name || 'Turnier',
-              matchId: m.id,
-              fieldId: m.fieldId,
-              fieldName,
-              playerIdentifier: playerName,
-              teamName: team.name,
+        if (activeField) {
+          const fieldName = activeField.name || m.fieldId || 'Spielfeld';
+
+          [m.team1, m.team2].forEach((team) => {
+            if (!team) return;
+            const playerNames = getTeamPlayerNames(team);
+            playerNames.forEach((playerName) => {
+              activeLocks.push({
+                tournamentId: tourney.id,
+                tournamentName: tourney.name || 'Turnier',
+                matchId: m.id,
+                fieldId: m.fieldId,
+                fieldName,
+                playerIdentifier: playerName,
+                teamName: team.name,
+              });
             });
           });
-        });
+        }
       }
     });
   });

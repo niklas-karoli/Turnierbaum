@@ -7,6 +7,7 @@ import {
   toggleMatchTimerInTournament,
 } from '../utils/timer';
 import { getMatchLockStatus } from '../utils/playerMapping';
+import { TeamNameDisplay } from './TeamNameDisplay';
 
 export const MatchListView = ({
   tournament,
@@ -174,9 +175,7 @@ export const MatchListView = ({
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: match.team1?.color || '#3b82f6' }}
                     />
-                    <span className="font-semibold text-xs text-slate-200">
-                      {match.team1 ? match.team1.name : 'TBD'}
-                    </span>
+                    <TeamNameDisplay team={match.team1} />
                   </div>
                   <span className="font-mono font-bold text-slate-100 text-sm">
                     {match.score1 ?? '-'}
@@ -189,9 +188,7 @@ export const MatchListView = ({
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: match.team2?.color || '#ef4444' }}
                     />
-                    <span className="font-semibold text-xs text-slate-200">
-                      {match.team2 ? match.team2.name : 'TBD'}
-                    </span>
+                    <TeamNameDisplay team={match.team2} />
                   </div>
                   <span className="font-mono font-bold text-slate-100 text-sm">
                     {match.score2 ?? '-'}
