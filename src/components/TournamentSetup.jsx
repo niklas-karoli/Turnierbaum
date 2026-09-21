@@ -47,29 +47,92 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
 
   // Derived mode & teamSize
   const mode = formatOption === '1v1' ? 'solo' : 'team';
-  const teamSize = formatOption;
+  const teamSize = formatOption || '2v2';
 
-  // Teams state
+  // Determine required member count based on format
+  const getExpectedMemberCount = (fmt) => {
+    if (fmt === '1v1') return 1;
+    if (fmt === '2v2') return 2;
+    if (fmt === '3v3') return 3;
+    if (fmt === '5v5') return 5;
+    return 2; // custom / default
+  };
+
+  const expectedMembers = getExpectedMemberCount(formatOption);
+
+  // Teams state initialized with member names
   const [teams, setTeams] = useState([
-    { id: 'team_1', name: 'FC Rakete', color: TEAM_COLORS[0], seed: 1 },
-    { id: 'team_2', name: 'Blitz Kicker', color: TEAM_COLORS[1], seed: 2 },
-    { id: 'team_3', name: 'Dynamo Chaos', color: TEAM_COLORS[2], seed: 3 },
-    { id: 'team_4', name: 'Smaragd United', color: TEAM_COLORS[3], seed: 4 },
+    {
+      id: 'team_1',
+      name: 'FC Rakete',
+      color: TEAM_COLORS[0],
+      seed: 1,
+      members: [
+        { id: 'm1_1', name: 'Max' },
+        { id: 'm1_2', name: 'Moritz' },
+      ],
+    },
+    {
+      id: 'team_2',
+      name: 'Blitz Kicker',
+      color: TEAM_COLORS[1],
+      seed: 2,
+      members: [
+        { id: 'm2_1', name: 'Felix' },
+        { id: 'm2_2', name: 'Lukas' },
+      ],
+    },
+    {
+      id: 'team_3',
+      name: 'Dynamo Chaos',
+      color: TEAM_COLORS[2],
+      seed: 3,
+      members: [
+        { id: 'm3_1', name: 'Paul' },
+        { id: 'm3_2', name: 'Jonas' },
+      ],
+    },
+    {
+      id: 'team_4',
+      name: 'Smaragd United',
+      color: TEAM_COLORS[3],
+      seed: 4,
+      members: [
+        { id: 'm4_1', name: 'David' },
+        { id: 'm4_2', name: 'Tim' },
+      ],
+    },
   ]);
 
   const [newTeamName, setNewTeamName] = useState('');
+  const [newMemberNames, setNewMemberNames] = useState(
+    Array.from({ length: expectedMembers }, () => '')
+  );
 
   // Auto Quick-Generate Placeholder Teams
   const generatePlaceholders = (count) => {
     const generated = [];
+    let memberCounter = 1;
+
     for (let i = 1; i <= count; i++) {
+      const members = [];
+      if (mode === 'solo') {
+        members.push({ id: `m_${Date.now()}_${i}_1`, name: `Spieler ${i}` });
+      } else {
+        for (let m = 1; m <= expectedMembers; m++) {
+          members.push({ id: `m_${Date.now()}_${i}_${m}`, name: `Spieler ${memberCounter++}` });
+        }
+      }
+
       generated.push({
         id: `team_${Date.now()}_${i}`,
         name: mode === 'solo' ? `Spieler ${i}` : `Team ${i}`,
         color: TEAM_COLORS[(i - 1) % TEAM_COLORS.length],
         seed: i,
+        members,
       });
     }
+
     setTeams(generated);
     if (system === TOURNAMENT_SYSTEMS.SWISS) {
       setSwissRounds(getRecommendedSwissRounds(count));
@@ -78,14 +141,31 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
 
   const handleAddTeam = () => {
     if (!newTeamName.trim()) return;
+
+    const members = [];
+    if (mode === 'solo') {
+      members.push({ id: `m_${Date.now()}_1`, name: newTeamName.trim() });
+    } else {
+      newMemberNames.forEach((mName, idx) => {
+        members.push({
+          id: `m_${Date.now()}_${idx + 1}`,
+          name: mName.trim() || `Spieler ${idx + 1}`,
+        });
+      });
+    }
+
     const newTeam = {
       id: `team_${Date.now()}`,
       name: newTeamName.trim(),
       color: TEAM_COLORS[teams.length % TEAM_COLORS.length],
       seed: teams.length + 1,
+      members,
     };
+
     setTeams([...teams, newTeam]);
     setNewTeamName('');
+    setNewMemberNames(Array.from({ length: expectedMembers }, () => ''));
+
     if (system === TOURNAMENT_SYSTEMS.SWISS) {
       setSwissRounds(getRecommendedSwissRounds(teams.length + 1));
     }
@@ -555,22 +635,48 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
               </div>
 
               {/* Add Team Input */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddTeam()}
-                  placeholder={mode === 'solo' ? 'Spielername eingeben...' : 'Teamname eingeben...'}
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddTeam}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-4 py-2 rounded-xl flex items-center gap-1 transition"
-                >
-                  <Plus className="w-4 h-4" /> Hinzufügen
-                </button>
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    placeholder={mode === 'solo' ? 'Spielername eingeben...' : 'Teamname eingeben (z. B. Die Zerstörer)...'}
+                    className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddTeam}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-4 py-2 rounded-xl flex items-center gap-1 transition shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" /> Hinzufügen
+                  </button>
+                </div>
+
+                {/* Member Names Inputs for Team Format */}
+                {mode === 'team' && (
+                  <div className="space-y-2 pt-1 border-t border-slate-800/80">
+                    <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                      Klarnamen der Teammitglieder ({expectedMembers} Personen):
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {Array.from({ length: expectedMembers }).map((_, mIdx) => (
+                        <input
+                          key={mIdx}
+                          type="text"
+                          value={newMemberNames[mIdx] || ''}
+                          onChange={(e) => {
+                            const updated = [...newMemberNames];
+                            updated[mIdx] = e.target.value;
+                            setNewMemberNames(updated);
+                          }}
+                          placeholder={`Spieler ${mIdx + 1} Name...`}
+                          className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Teams List */}
@@ -578,32 +684,63 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
                 {teams.map((t, idx) => (
                   <div
                     key={t.id}
-                    className="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-800 rounded-xl"
+                    className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-mono text-slate-500 w-5">#{idx + 1}</span>
-                      <div
-                        className="w-3.5 h-3.5 rounded-full border border-white/20"
-                        style={{ backgroundColor: t.color }}
-                      />
-                      <input
-                        type="text"
-                        value={t.name}
-                        onChange={(e) => {
-                          const updated = [...teams];
-                          updated[idx].name = e.target.value;
-                          setTeams(updated);
-                        }}
-                        className="bg-transparent text-xs font-medium text-slate-200 focus:outline-none border-b border-transparent focus:border-indigo-500"
-                      />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono text-slate-500 w-5">#{idx + 1}</span>
+                        <div
+                          className="w-3.5 h-3.5 rounded-full border border-white/20"
+                          style={{ backgroundColor: t.color }}
+                        />
+                        <input
+                          type="text"
+                          value={t.name}
+                          onChange={(e) => {
+                            const updated = [...teams];
+                            updated[idx].name = e.target.value;
+                            if (mode === 'solo' && updated[idx].members?.[0]) {
+                              updated[idx].members[0].name = e.target.value;
+                            }
+                            setTeams(updated);
+                          }}
+                          className="bg-transparent text-xs font-bold text-slate-200 focus:outline-none border-b border-transparent focus:border-indigo-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTeam(t.id)}
+                        className="text-slate-500 hover:text-red-400 p-1 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTeam(t.id)}
-                      className="text-slate-500 hover:text-red-400 p-1 transition"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                    {/* Member editing if team mode */}
+                    {mode === 'team' && (
+                      <div className="pl-8 flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] text-slate-400 font-semibold uppercase">
+                          Spieler:
+                        </span>
+                        {(t.members || []).map((m, mIdx) => (
+                          <input
+                            key={m.id || mIdx}
+                            type="text"
+                            value={m.name || ''}
+                            onChange={(e) => {
+                              const updatedTeams = [...teams];
+                              if (!updatedTeams[idx].members) updatedTeams[idx].members = [];
+                              updatedTeams[idx].members[mIdx] = {
+                                ...updatedTeams[idx].members[mIdx],
+                                name: e.target.value,
+                              };
+                              setTeams(updatedTeams);
+                            }}
+                            className="bg-slate-900 border border-slate-800 rounded px-2 py-0.5 text-[11px] text-slate-300 w-28 focus:outline-none focus:border-indigo-500"
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

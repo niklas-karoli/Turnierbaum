@@ -18,44 +18,78 @@ import { FieldsView } from './components/FieldsView';
 import { MatchListView } from './components/MatchListView';
 import { RandomToolsModal } from './components/RandomToolsModal';
 import { ActivityLogView } from './components/ActivityLogView';
+import { ParallelTournamentModal } from './components/ParallelTournamentModal';
 
 import { saveToLocalStorage, loadFromLocalStorage, exportToJsonFile, importFromJsonFile } from './utils/storage';
 import { createInitialHistory, recordState, undoState } from './utils/historyManager';
 import { updateMatchResult } from './engines/matchUpdater';
-import { autoAssignFields } from './engines/fieldScheduler';
+import { autoAssignFieldsAllTournaments } from './engines/fieldScheduler';
 import { generateNextSwissRound } from './engines/swiss';
-import { MATCH_STATUS, TOURNAMENT_SYSTEMS } from './types';
+import { TOURNAMENT_SYSTEMS } from './types';
 
 export default function App() {
   const [history, setHistory] = useState(() => {
     const saved = loadFromLocalStorage();
-    if (saved) {
+    if (saved && Array.isArray(saved.tournaments) && saved.tournaments.length > 0) {
       return createInitialHistory(saved);
     }
     return null;
   });
 
-  const tournament = history?.present || null;
+  const appState = history?.present || null;
+  const tournaments = appState?.tournaments || [];
+  const activeTournamentId = appState?.activeTournamentId || tournaments[0]?.id || null;
+  const playerMappings = appState?.playerMappings || [];
+
+  const tournament = tournaments.find((t) => t.id === activeTournamentId) || tournaments[0] || null;
 
   // Active View Tab: 'bracket' | 'standings' | 'fields' | 'matches' | 'log'
   const [activeTab, setActiveTab] = useState('bracket');
 
   // Modals state
-  const [showWizard, setShowWizard] = useState(!tournament);
+  const [showWizard, setShowWizard] = useState(tournaments.length === 0);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [showRandomTools, setShowRandomTools] = useState(false);
+  const [showParallelModal, setShowParallelModal] = useState(false);
 
-  // Auto-save to localStorage whenever tournament state updates
+  // Auto-save to localStorage whenever app state updates
   useEffect(() => {
-    if (tournament) {
-      saveToLocalStorage(tournament);
+    if (appState) {
+      saveToLocalStorage(appState);
     }
-  }, [tournament]);
+  }, [appState]);
+
+  // Handle Switch Active Tournament
+  const handleSelectTournament = (tourneyId) => {
+    if (!appState) return;
+    const updatedState = {
+      ...appState,
+      activeTournamentId: tourneyId,
+    };
+    setHistory((prev) => ({
+      ...prev,
+      present: updatedState,
+    }));
+  };
 
   // Handle New Tournament Creation
   const handleCreateTournament = (newTournament) => {
-    const initialized = autoAssignFields(newTournament);
-    const newHistory = createInitialHistory(initialized);
+    const existingTournaments = appState?.tournaments || [];
+    const updatedTournamentsList = [...existingTournaments, newTournament];
+
+    // Run auto assignment across all tournaments
+    const scheduledTournaments = autoAssignFieldsAllTournaments(
+      updatedTournamentsList,
+      playerMappings
+    );
+
+    const nextAppState = {
+      tournaments: scheduledTournaments,
+      activeTournamentId: newTournament.id,
+      playerMappings: playerMappings,
+    };
+
+    const newHistory = createInitialHistory(nextAppState);
     setHistory(newHistory);
     setShowWizard(false);
 
@@ -66,15 +100,47 @@ export default function App() {
     }
   };
 
+  // Handle Player Mappings Update
+  const handleUpdatePlayerMappings = (newMappings) => {
+    if (!appState) return;
+
+    // Re-run auto assignment with new mappings
+    const reassignedTournaments = autoAssignFieldsAllTournaments(
+      appState.tournaments,
+      newMappings
+    );
+
+    const updatedAppState = {
+      ...appState,
+      tournaments: reassignedTournaments,
+      playerMappings: newMappings,
+    };
+
+    const newHistory = recordState(
+      history,
+      updatedAppState,
+      'Personen-Verknüpfungen aktualisiert.'
+    );
+    setHistory(newHistory);
+  };
+
   // Handle Match Score Save
   const handleSaveMatchResult = (matchId, score1, score2) => {
-    if (!tournament) return;
+    if (!tournament || !appState) return;
 
-    // Record match score and compute progression
-    let updated = updateMatchResult(tournament, matchId, score1, score2);
+    // 1. Update target match result in active tournament
+    let updatedActiveTourney = updateMatchResult(tournament, matchId, score1, score2);
 
-    // Auto assign fields
-    updated = autoAssignFields(updated);
+    // Replace in tournaments list
+    let updatedTournamentsList = appState.tournaments.map((t) =>
+      t.id === updatedActiveTourney.id ? updatedActiveTourney : t
+    );
+
+    // 2. Re-assign fields across all tournaments (frees up fields and unblocks locked player matches)
+    updatedTournamentsList = autoAssignFieldsAllTournaments(
+      updatedTournamentsList,
+      playerMappings
+    );
 
     const matchObj = (tournament.system === 'hybrid' && tournament.playoffMatches
       ? [...tournament.matches, ...tournament.playoffMatches]
@@ -82,10 +148,15 @@ export default function App() {
     ).find((m) => m.id === matchId);
 
     const logText = matchObj
-      ? `Ergebnis eingetragen: ${matchObj.team1?.name} ${score1} : ${score2} ${matchObj.team2?.name}`
+      ? `[${tournament.name}] Ergebnis eingetragen: ${matchObj.team1?.name} ${score1} : ${score2} ${matchObj.team2?.name}`
       : `Match ${matchId} beendet.`;
 
-    const newHistory = recordState(history, updated, logText);
+    const nextAppState = {
+      ...appState,
+      tournaments: updatedTournamentsList,
+    };
+
+    const newHistory = recordState(history, nextAppState, logText);
     setHistory(newHistory);
 
     // Trigger celebration confetti if final completed!
@@ -96,15 +167,28 @@ export default function App() {
 
   // Handle Swiss System Next Round Trigger
   const handleGenerateNextSwissRound = () => {
-    if (!tournament || tournament.system !== TOURNAMENT_SYSTEMS.SWISS) return;
+    if (!tournament || tournament.system !== TOURNAMENT_SYSTEMS.SWISS || !appState) return;
 
-    let updated = generateNextSwissRound(tournament);
-    if (updated) {
-      updated = autoAssignFields(updated);
+    let updatedTourney = generateNextSwissRound(tournament);
+    if (updatedTourney) {
+      let updatedTournamentsList = appState.tournaments.map((t) =>
+        t.id === updatedTourney.id ? updatedTourney : t
+      );
+
+      updatedTournamentsList = autoAssignFieldsAllTournaments(
+        updatedTournamentsList,
+        playerMappings
+      );
+
+      const nextAppState = {
+        ...appState,
+        tournaments: updatedTournamentsList,
+      };
+
       const newHistory = recordState(
         history,
-        updated,
-        `Swiss Runde ${updated.currentRound} wurde generiert.`
+        nextAppState,
+        `[${tournament.name}] Swiss Runde ${updatedTourney.currentRound} wurde generiert.`
       );
       setHistory(newHistory);
     }
@@ -136,16 +220,24 @@ export default function App() {
 
   // Handle Export JSON Backup
   const handleExportJson = () => {
-    if (tournament) {
-      exportToJsonFile(tournament);
+    if (appState) {
+      exportToJsonFile(appState);
     }
   };
 
   // Generic direct state update without adding to undo stack for smooth timer ticks
   const handleUpdateTournamentDirect = (updatedTournament) => {
+    if (!appState) return;
+    const updatedTournaments = appState.tournaments.map((t) =>
+      t.id === updatedTournament.id ? updatedTournament : t
+    );
+
     setHistory((prev) => ({
       ...prev,
-      present: updatedTournament,
+      present: {
+        ...prev.present,
+        tournaments: updatedTournaments,
+      },
     }));
   };
 
@@ -154,12 +246,16 @@ export default function App() {
       {/* Header Bar */}
       <Header
         tournament={tournament}
+        tournaments={tournaments}
+        activeTournamentId={activeTournamentId}
+        onSelectTournament={handleSelectTournament}
         onNewTournament={() => setShowWizard(true)}
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
         onUndo={handleUndo}
         canUndo={!!(history && history.past.length > 0)}
         onOpenRandomTools={() => setShowRandomTools(true)}
+        onOpenParallelModal={() => setShowParallelModal(true)}
       />
 
       {/* Main Container */}
@@ -284,6 +380,8 @@ export default function App() {
                       onSelectMatch={(m) => setSelectedMatch(m)}
                       bracketTitle="Winner-Bracket (Gewinner)"
                       tournament={tournament}
+                      tournaments={tournaments}
+                      playerMappings={playerMappings}
                       onUpdateTournament={handleUpdateTournamentDirect}
                     />
                     <BracketView
@@ -292,6 +390,8 @@ export default function App() {
                       onSelectMatch={(m) => setSelectedMatch(m)}
                       bracketTitle="Loser-Bracket (Verlierer)"
                       tournament={tournament}
+                      tournaments={tournaments}
+                      playerMappings={playerMappings}
                       onUpdateTournament={handleUpdateTournamentDirect}
                     />
                     <BracketView
@@ -300,6 +400,8 @@ export default function App() {
                       onSelectMatch={(m) => setSelectedMatch(m)}
                       bracketTitle="Grand Final (Finale)"
                       tournament={tournament}
+                      tournaments={tournaments}
+                      playerMappings={playerMappings}
                       onUpdateTournament={handleUpdateTournamentDirect}
                     />
                   </div>
@@ -311,6 +413,8 @@ export default function App() {
                       onSelectMatch={(m) => setSelectedMatch(m)}
                       bracketTitle="Playoff K.-o.-Baum"
                       tournament={tournament}
+                      tournaments={tournaments}
+                      playerMappings={playerMappings}
                       onUpdateTournament={handleUpdateTournamentDirect}
                     />
                   ) : (
@@ -333,6 +437,8 @@ export default function App() {
                     matches={tournament.matches}
                     onSelectMatch={(m) => setSelectedMatch(m)}
                     tournament={tournament}
+                    tournaments={tournaments}
+                    playerMappings={playerMappings}
                     onUpdateTournament={handleUpdateTournamentDirect}
                   />
                 )}
@@ -344,6 +450,8 @@ export default function App() {
             {activeTab === 'fields' && (
               <FieldsView
                 tournament={tournament}
+                tournaments={tournaments}
+                playerMappings={playerMappings}
                 onSelectMatch={(m) => setSelectedMatch(m)}
                 onUpdateTournament={handleUpdateTournamentDirect}
               />
@@ -352,6 +460,8 @@ export default function App() {
             {activeTab === 'matches' && (
               <MatchListView
                 tournament={tournament}
+                tournaments={tournaments}
+                playerMappings={playerMappings}
                 onSelectMatch={(m) => setSelectedMatch(m)}
                 onUpdateTournament={handleUpdateTournamentDirect}
               />
@@ -366,7 +476,7 @@ export default function App() {
       {showWizard && (
         <TournamentSetup
           onCreateTournament={handleCreateTournament}
-          onClose={tournament ? () => setShowWizard(false) : null}
+          onClose={tournaments.length > 0 ? () => setShowWizard(false) : null}
         />
       )}
 
@@ -384,6 +494,16 @@ export default function App() {
         <RandomToolsModal
           teams={tournament.teams}
           onClose={() => setShowRandomTools(false)}
+        />
+      )}
+
+      {showParallelModal && (
+        <ParallelTournamentModal
+          tournaments={tournaments}
+          activeTournamentId={activeTournamentId}
+          playerMappings={playerMappings}
+          onUpdatePlayerMappings={handleUpdatePlayerMappings}
+          onClose={() => setShowParallelModal(false)}
         />
       )}
     </div>

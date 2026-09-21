@@ -1,16 +1,17 @@
-const STORAGE_KEY = 'turnier_master_current_tournament';
+const STORAGE_KEY = 'turnier_master_app_data';
+const OLD_STORAGE_KEY = 'turnier_master_current_tournament';
 
 /**
- * Saves current tournament state to localStorage
+ * Saves state container (tournaments, activeTournamentId, playerMappings) to localStorage
  */
-export const saveToLocalStorage = (tournament) => {
+export const saveToLocalStorage = (appData) => {
   try {
-    if (!tournament) {
+    if (!appData) {
       localStorage.removeItem(STORAGE_KEY);
       return;
     }
     const dataToSave = {
-      ...tournament,
+      ...appData,
       lastSaved: new Date().toISOString(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
@@ -20,13 +21,37 @@ export const saveToLocalStorage = (tournament) => {
 };
 
 /**
- * Loads saved tournament state from localStorage
+ * Loads saved app data from localStorage with backward compatibility
  */
 export const loadFromLocalStorage = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Ensure array structures
+      if (parsed && Array.isArray(parsed.tournaments)) {
+        return {
+          tournaments: parsed.tournaments,
+          activeTournamentId: parsed.activeTournamentId || (parsed.tournaments[0]?.id || null),
+          playerMappings: parsed.playerMappings || [],
+        };
+      }
+    }
+
+    // Fallback: Check old single-tournament key
+    const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
+    if (oldRaw) {
+      const oldParsed = JSON.parse(oldRaw);
+      if (oldParsed && oldParsed.id) {
+        return {
+          tournaments: [oldParsed],
+          activeTournamentId: oldParsed.id,
+          playerMappings: [],
+        };
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error('Fehler beim Laden aus localStorage:', error);
     return null;
@@ -45,18 +70,20 @@ export const clearLocalStorage = () => {
 };
 
 /**
- * Exports tournament state as a downloaded .json file
+ * Exports full app state or single tournament state as downloaded .json file
  */
-export const exportToJsonFile = (tournament) => {
-  if (!tournament) return;
+export const exportToJsonFile = (appData) => {
+  if (!appData) return;
 
-  const jsonStr = JSON.stringify(tournament, null, 2);
+  const jsonStr = JSON.stringify(appData, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
-  const sanitizedName = (tournament.name || 'turnier')
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/gi, '_');
+  const nameToUse = appData.tournaments
+    ? 'turnier_manager_pro_all'
+    : (appData.name || 'turnier');
+
+  const sanitizedName = nameToUse.toLowerCase().replace(/[^a-z0-9_-]/gi, '_');
   const timestamp = new Date().toISOString().slice(0, 10);
 
   const link = document.createElement('a');
@@ -69,7 +96,7 @@ export const exportToJsonFile = (tournament) => {
 };
 
 /**
- * Reads and parses an uploaded JSON file
+ * Reads and parses an uploaded JSON file (supports single tournament or full app backup)
  */
 export const importFromJsonFile = (file) => {
   return new Promise((resolve, reject) => {
@@ -82,11 +109,23 @@ export const importFromJsonFile = (file) => {
     reader.onload = (e) => {
       try {
         const parsed = JSON.parse(e.target.result);
-        if (!parsed || typeof parsed !== 'object' || !parsed.id || !parsed.system) {
-          reject(new Error('Ungültiges Turnier-Format in der JSON-Datei'));
+        if (!parsed || typeof parsed !== 'object') {
+          reject(new Error('Ungültiges Format in der JSON-Datei'));
           return;
         }
-        resolve(parsed);
+
+        if (Array.isArray(parsed.tournaments)) {
+          resolve(parsed);
+        } else if (parsed.id && parsed.system) {
+          // Single tournament import
+          resolve({
+            tournaments: [parsed],
+            activeTournamentId: parsed.id,
+            playerMappings: [],
+          });
+        } else {
+          reject(new Error('Ungültiges Turnier-Format in der JSON-Datei'));
+        }
       } catch (err) {
         reject(new Error('Fehler beim Lesen der JSON-Datei: Ungültiges JSON-Format'));
       }
