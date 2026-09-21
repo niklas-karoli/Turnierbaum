@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, Play, Pause, Clock } from 'lucide-react';
+import { LayoutGrid, Play, Pause, Clock, Lock } from 'lucide-react';
 import {
   getMatchRemainingSeconds,
   formatTimerDisplay,
   toggleMatchTimerInTournament,
 } from '../utils/timer';
+import { getMatchLockStatus } from '../utils/playerMapping';
+import { TeamNameDisplay } from './TeamNameDisplay';
 
-export const FieldsView = ({ tournament, onSelectMatch, onUpdateTournament }) => {
+export const FieldsView = ({
+  tournament,
+  tournaments = [tournament],
+  playerMappings = [],
+  onSelectMatch,
+  onUpdateTournament,
+}) => {
   const fields = tournament.fields || [];
 
   const allMatches = tournament.system === 'hybrid' && tournament.playoffMatches
@@ -15,7 +23,7 @@ export const FieldsView = ({ tournament, onSelectMatch, onUpdateTournament }) =>
 
   const isAnyRunning = allMatches.some((m) => m.isTimerRunning);
 
-  const [now, setNow] = useState(Date.now());
+  const [, setNow] = useState(0);
 
   useEffect(() => {
     if (isAnyRunning) {
@@ -51,15 +59,29 @@ export const FieldsView = ({ tournament, onSelectMatch, onUpdateTournament }) =>
           const activeMatch = allMatches.find((m) => m.id === field.currentMatchId);
           const remainingSeconds = activeMatch ? getMatchRemainingSeconds(activeMatch) : 600;
 
+          const lockStatus = activeMatch && tournament
+            ? getMatchLockStatus(activeMatch, tournament.id, tournaments, playerMappings)
+            : { isLocked: false, reason: null };
+
           return (
             <div
               key={field.id}
               className={`p-5 rounded-2xl border transition shadow-sm ${
                 field.status === 'busy' && activeMatch
-                  ? 'bg-slate-900 border-indigo-500/80 ring-1 ring-indigo-500/20'
+                  ? lockStatus.isLocked
+                    ? 'bg-slate-900 border-amber-500/80 ring-1 ring-amber-500/20'
+                    : 'bg-slate-900 border-indigo-500/80 ring-1 ring-indigo-500/20'
                   : 'bg-slate-900 border-slate-800'
               }`}
             >
+              {/* Lock Warning if applicable */}
+              {lockStatus.isLocked && (
+                <div className="mb-3 p-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-1.5 text-xs text-amber-300 font-medium">
+                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>{lockStatus.reason}</span>
+                </div>
+              )}
+
               {/* Field Header */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
                 <span className="font-semibold text-slate-100 text-sm">{field.name}</span>
@@ -87,12 +109,10 @@ export const FieldsView = ({ tournament, onSelectMatch, onUpdateTournament }) =>
                     <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-2.5 h-2.5 rounded-full"
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: activeMatch.team1?.color || '#3b82f6' }}
                         />
-                        <span className="font-semibold text-xs text-slate-200">
-                          {activeMatch.team1?.name}
-                        </span>
+                        <TeamNameDisplay team={activeMatch.team1} />
                       </div>
                       <span className="font-mono font-bold text-indigo-400 text-sm">
                         {activeMatch.score1 ?? '-'}
@@ -102,12 +122,10 @@ export const FieldsView = ({ tournament, onSelectMatch, onUpdateTournament }) =>
                     <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-2.5 h-2.5 rounded-full"
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: activeMatch.team2?.color || '#ef4444' }}
                         />
-                        <span className="font-semibold text-xs text-slate-200">
-                          {activeMatch.team2?.name}
-                        </span>
+                        <TeamNameDisplay team={activeMatch.team2} />
                       </div>
                       <span className="font-mono font-bold text-indigo-400 text-sm">
                         {activeMatch.score2 ?? '-'}

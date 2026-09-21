@@ -21,10 +21,33 @@ export const initializeFields = (count = 2) => {
   return fields;
 };
 
+import { getMatchLockStatus } from '../utils/playerMapping';
+
 /**
- * Auto-assigns pending/ready matches to available fields
+ * Helper to sort ready matches by original schedule priority:
+ * Round number ascending, then Match ID ascending.
  */
-export const autoAssignFields = (tournament) => {
+export const sortMatchesBySchedulePriority = (matches = []) => {
+  return [...matches].sort((a, b) => {
+    const roundA = a.round ?? 1;
+    const roundB = b.round ?? 1;
+    if (roundA !== roundB) return roundA - roundB;
+
+    const idA = String(a.id || '');
+    const idB = String(b.id || '');
+    return idA.localeCompare(idB, undefined, { numeric: true });
+  });
+};
+
+/**
+ * Auto-assigns pending/ready matches to available fields with
+ * cross-tournament player lock awareness and round/match-id priority.
+ */
+export const autoAssignFields = (
+  tournament,
+  allTournaments = [tournament],
+  playerMappings = []
+) => {
   if (!tournament || !tournament.fields || tournament.fields.length === 0) {
     return tournament;
   }
@@ -33,54 +56,101 @@ export const autoAssignFields = (tournament) => {
     ? [...tournament.matches, ...tournament.playoffMatches]
     : [...tournament.matches];
 
-  const updatedFields = [...tournament.fields];
-  let matchesChanged = false;
-  const updatedMatches = matches.map((m) => ({ ...m }));
+  let updatedFields = tournament.fields.map((f) => ({ ...f }));
+  let updatedMatches = matches.map((m) => ({ ...m }));
 
-  // Collect teams currently active on a field
+  // 1. Sanitize fields & matches:
+  // Clean up completed/missing matches from fields
+  updatedFields.forEach((field, idx) => {
+    if (field.currentMatchId) {
+      const activeMatch = updatedMatches.find((m) => m.id === field.currentMatchId);
+      if (!activeMatch || activeMatch.status === MATCH_STATUS.COMPLETED) {
+        updatedFields[idx] = { ...field, currentMatchId: null, status: 'free' };
+      }
+    }
+  });
+
+  // Revert orphan 'ONGOING' matches that are not held by any field in updatedFields
+  const activeFieldMatchIds = new Set(
+    updatedFields.map((f) => f.currentMatchId).filter(Boolean)
+  );
+
+  updatedMatches = updatedMatches.map((m) => {
+    if (m.status === MATCH_STATUS.ONGOING) {
+      if (!activeFieldMatchIds.has(m.id)) {
+        // Revert to READY or PENDING
+        const isReady = Boolean(m.team1 && m.team2);
+        return {
+          ...m,
+          status: isReady ? MATCH_STATUS.READY : MATCH_STATUS.PENDING,
+          fieldId: null,
+          isTimerRunning: false,
+        };
+      }
+    }
+    return m;
+  });
+
+  // 2. Collect teams currently active on a field in this tournament
   const busyTeamIds = new Set();
   updatedMatches.forEach((m) => {
-    if (m.status === MATCH_STATUS.ONGOING) {
+    if (m.status === MATCH_STATUS.ONGOING && activeFieldMatchIds.has(m.id)) {
       if (m.team1) busyTeamIds.add(m.team1.id);
       if (m.team2) busyTeamIds.add(m.team2.id);
     }
   });
 
-  // Assign free fields to eligible ready matches
+  // 3. Assign free fields to eligible ready matches based on schedule priority
   updatedFields.forEach((field, fIdx) => {
-    // Check if currently assigned match on field is completed
-    if (field.currentMatchId) {
-      const activeMatch = updatedMatches.find((m) => m.id === field.currentMatchId);
-      if (!activeMatch || activeMatch.status === MATCH_STATUS.COMPLETED) {
-        updatedFields[fIdx] = { ...field, currentMatchId: null, status: 'free' };
-      }
-    }
-
-    // If field is free, assign next ready match
     if (!updatedFields[fIdx].currentMatchId) {
-      const nextMatchIdx = updatedMatches.findIndex((m) => {
+      // Find candidate matches with status READY
+      const candidateMatches = updatedMatches.filter((m) => {
         if (m.status !== MATCH_STATUS.READY) return false;
-        if (m.fieldId && m.fieldId !== field.id) return false; // Already queued elsewhere
         if (!m.team1 || !m.team2) return false;
 
-        // Check if either team is currently playing in another match
+        // Check if either team is busy in this tournament
         if (busyTeamIds.has(m.team1.id) || busyTeamIds.has(m.team2.id)) {
+          return false;
+        }
+
+        // Check if any player in this match is locked across all tournaments
+        const lockStatus = getMatchLockStatus(
+          m,
+          tournament.id,
+          allTournaments,
+          playerMappings
+        );
+
+        if (lockStatus.isLocked) {
           return false;
         }
 
         return true;
       });
 
-      if (nextMatchIdx !== -1) {
-        const nextMatch = updatedMatches[nextMatchIdx];
-        nextMatch.status = MATCH_STATUS.ONGOING;
-        nextMatch.fieldId = field.id;
-        updatedFields[fIdx] = { ...field, currentMatchId: nextMatch.id, status: 'busy' };
+      // Sort candidate matches by round ascending, then ID ascending
+      const sortedCandidates = sortMatchesBySchedulePriority(candidateMatches);
 
-        // Add teams to busy set
-        busyTeamIds.add(nextMatch.team1.id);
-        busyTeamIds.add(nextMatch.team2.id);
-        matchesChanged = true;
+      if (sortedCandidates.length > 0) {
+        const nextMatch = sortedCandidates[0];
+        const matchIndex = updatedMatches.findIndex((m) => m.id === nextMatch.id);
+
+        if (matchIndex !== -1) {
+          updatedMatches[matchIndex] = {
+            ...updatedMatches[matchIndex],
+            status: MATCH_STATUS.ONGOING,
+            fieldId: field.id,
+          };
+
+          updatedFields[fIdx] = {
+            ...field,
+            currentMatchId: nextMatch.id,
+            status: 'busy',
+          };
+
+          busyTeamIds.add(nextMatch.team1.id);
+          busyTeamIds.add(nextMatch.team2.id);
+        }
       }
     }
   });
@@ -104,10 +174,30 @@ export const autoAssignFields = (tournament) => {
 };
 
 /**
+ * Runs autoAssignFields across all tournaments until state stabilizes
+ */
+export const autoAssignFieldsAllTournaments = (
+  tournaments = [],
+  playerMappings = []
+) => {
+  if (!tournaments || tournaments.length === 0) return tournaments;
+
+  let currentTournaments = [...tournaments];
+
+  // Multi-pass auto assignment to cascade field releases across linked tournaments
+  for (let pass = 0; pass < 3; pass++) {
+    currentTournaments = currentTournaments.map((t) =>
+      autoAssignFields(t, currentTournaments, playerMappings)
+    );
+  }
+
+  return currentTournaments;
+};
+
+/**
  * Manually assign a match to a specific field
  */
 export const assignMatchToField = (tournament, matchId, fieldId) => {
-  let updated = { ...tournament };
   const matches = tournament.system === 'hybrid' && tournament.playoffMatches
     ? [...tournament.matches, ...tournament.playoffMatches]
     : [...tournament.matches];

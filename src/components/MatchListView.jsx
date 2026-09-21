@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { ListFilter, Play, Pause, CheckCircle, Clock } from 'lucide-react';
+import { ListFilter, Play, Pause, CheckCircle, Clock, Lock } from 'lucide-react';
 import { MATCH_STATUS } from '../types';
 import {
   getMatchRemainingSeconds,
   formatTimerDisplay,
   toggleMatchTimerInTournament,
 } from '../utils/timer';
+import { getMatchLockStatus } from '../utils/playerMapping';
+import { TeamNameDisplay } from './TeamNameDisplay';
 
-export const MatchListView = ({ tournament, onSelectMatch, onUpdateTournament }) => {
+export const MatchListView = ({
+  tournament,
+  tournaments = [tournament],
+  playerMappings = [],
+  onSelectMatch,
+  onUpdateTournament,
+}) => {
   const [filter, setFilter] = useState('all'); // 'all' | 'ready' | 'ongoing' | 'completed'
   const [, setNow] = useState(0);
 
@@ -95,12 +103,28 @@ export const MatchListView = ({ tournament, onSelectMatch, onUpdateTournament })
             match.status === MATCH_STATUS.ONGOING ||
             match.status === MATCH_STATUS.COMPLETED;
 
+          const lockStatus = tournament
+            ? getMatchLockStatus(match, tournament.id, tournaments, playerMappings)
+            : { isLocked: false, reason: null };
+
           return (
             <div
               key={match.id}
               onClick={() => canInteract && onSelectMatch(match)}
-              className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm hover:border-slate-700 transition cursor-pointer flex flex-col justify-between gap-3 group"
+              className={`p-4 bg-slate-900 border rounded-2xl shadow-sm hover:border-slate-700 transition cursor-pointer flex flex-col justify-between gap-3 group ${
+                lockStatus.isLocked
+                  ? 'border-amber-500/60 bg-amber-950/10'
+                  : 'border-slate-800'
+              }`}
             >
+              {/* Lock Indicator Bar */}
+              {lockStatus.isLocked && (
+                <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-1.5 text-xs text-amber-300 font-medium">
+                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>{lockStatus.reason}</span>
+                </div>
+              )}
+
               {/* Header Badge Row */}
               <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
                 <span className="flex items-center gap-2">
@@ -151,9 +175,7 @@ export const MatchListView = ({ tournament, onSelectMatch, onUpdateTournament })
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: match.team1?.color || '#3b82f6' }}
                     />
-                    <span className="font-semibold text-xs text-slate-200">
-                      {match.team1 ? match.team1.name : 'TBD'}
-                    </span>
+                    <TeamNameDisplay team={match.team1} />
                   </div>
                   <span className="font-mono font-bold text-slate-100 text-sm">
                     {match.score1 ?? '-'}
@@ -166,9 +188,7 @@ export const MatchListView = ({ tournament, onSelectMatch, onUpdateTournament })
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: match.team2?.color || '#ef4444' }}
                     />
-                    <span className="font-semibold text-xs text-slate-200">
-                      {match.team2 ? match.team2.name : 'TBD'}
-                    </span>
+                    <TeamNameDisplay team={match.team2} />
                   </div>
                   <span className="font-mono font-bold text-slate-100 text-sm">
                     {match.score2 ?? '-'}
@@ -191,7 +211,12 @@ export const MatchListView = ({ tournament, onSelectMatch, onUpdateTournament })
                       <Clock className="w-3.5 h-3.5" /> Laufend
                     </span>
                   )}
-                  {match.status === MATCH_STATUS.READY && (
+                  {match.status === MATCH_STATUS.READY && lockStatus.isLocked && (
+                    <span className="text-amber-400 font-medium flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> Gesperrt
+                    </span>
+                  )}
+                  {match.status === MATCH_STATUS.READY && !lockStatus.isLocked && (
                     <span className="text-slate-300 font-medium">Anstehend / Bereit</span>
                   )}
                   {match.status === MATCH_STATUS.PENDING && (
