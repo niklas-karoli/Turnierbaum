@@ -26,7 +26,7 @@ export const TournamentSetup = ({ onCreateTournament, onClose }) => {
   const [step, setStep] = useState(1);
 
   // Form State
-  const [name, setName] = useState('Turnier 2025');
+  const [name, setName] = useState('Turnier');
   const [formatOption, setFormatOption] = useState('2v2'); // '1v1', '2v2', '3v3', '5v5', 'custom'
   const [system, setSystem] = useState(TOURNAMENT_SYSTEMS.SINGLE_ELIMINATION);
   const [fieldCount, setFieldCount] = useState(2);
